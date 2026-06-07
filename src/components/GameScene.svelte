@@ -13,7 +13,8 @@
     isTyping,
     showMenu,
     loadState,
-    resetGameState
+    resetGameState,
+    settings
   } from '../lib/store';
   import {
     getCurrentNode,
@@ -26,6 +27,7 @@
     restartGame,
     getEndingById,
     triggerDanmakusForDialogue,
+    triggerDanmakuAtChar,
     clearDanmakuTimeouts
   } from '../lib/engine';
   import { playBGM, playSFX, initAudio, resumeAudio, stopBGM } from '../lib/audio';
@@ -84,6 +86,48 @@
     playSFX('click');
     advance();
     updateState();
+  }
+
+  function handleLineStart() {
+    const state = get(gameState);
+    if (currentDialogue) {
+      const charDelay = getCharDelayForDialogue(currentDialogue);
+      triggerDanmakusForDialogue(state.dialogueIndex, charDelay);
+    }
+  }
+
+  function handleCharTyped(e: CustomEvent<{ index: number; char: string }>) {
+    const state = get(gameState);
+    if (currentDialogue) {
+      const charDelay = getCharDelayForDialogue(currentDialogue);
+      triggerDanmakuAtChar(state.dialogueIndex, e.detail.index, charDelay);
+    }
+  }
+
+  function getCharDelayForDialogue(d: DialogueLine): number {
+    const textSpeed = $settings.textSpeed;
+    const base = d.baseTypingSpeed !== undefined
+      ? Math.max(15, 100 - d.baseTypingSpeed)
+      : Math.max(15, 100 - textSpeed);
+    const moodMultipliers: Record<string, number> = {
+      normal: 1.0, tense: 0.7, scared: 1.4, calm: 1.3, whisper: 1.6, urgent: 0.5
+    };
+    return base * (moodMultipliers[d.mood || 'normal'] || 1.0);
+  }
+
+  function calculateCharTime(text: string, targetIndex: number, charDelay: number): number {
+    let time = 0;
+    const punctuationPause = charDelay * 2.5;
+    for (let i = 0; i < Math.min(targetIndex, text.length); i++) {
+      const char = text[i];
+      time += charDelay;
+      if (char === '。' || char === '！' || char === '？' || char === '…' || char === '—') {
+        time += punctuationPause;
+      } else if (char === '，' || char === '、' || char === '；' || char === '：') {
+        time += charDelay * 1.2;
+      }
+    }
+    return time;
   }
 
   function handleChoice(choiceId: string) {
@@ -167,7 +211,12 @@
 
   {#if !isEnding}
     {#if !showChoices}
-      <DialogueBox dialogue={currentDialogue} onComplete={handleDialogueComplete} />
+      <DialogueBox 
+        dialogue={currentDialogue} 
+        onComplete={handleDialogueComplete}
+        on:lineStart={handleLineStart}
+        on:charTyped={handleCharTyped}
+      />
     {:else}
       <ChoicePanel choices={availableChoices} onSelect={handleChoice} />
     {/if}

@@ -128,19 +128,58 @@ export function goToNode(nodeId: string): void {
 
 let danmakuTimeouts: number[] = [];
 
-export function triggerDanmakusForDialogue(dialogueIndex: number): void {
+function calculateCharTime(text: string, targetIndex: number, charDelay: number): number {
+  let time = 0;
+  const punctuationPause = charDelay * 2.5;
+  for (let i = 0; i < Math.min(targetIndex, text.length); i++) {
+    const char = text[i];
+    time += charDelay;
+    if (char === '。' || char === '！' || char === '？' || char === '…' || char === '—') {
+      time += punctuationPause;
+    } else if (char === '，' || char === '、' || char === '；' || char === '：') {
+      time += charDelay * 1.2;
+    }
+  }
+  return time;
+}
+
+function calculateTotalTypingDuration(text: string, charDelay: number): number {
+  return calculateCharTime(text, text.length, charDelay);
+}
+
+export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: number = 50): void {
   clearDanmakuTimeouts();
   
   const node = getCurrentNode();
   if (!node?.danmakus) return;
   
-  const baseTime = dialogueIndex * 10000;
-  const relevantDanmakus = node.danmakus.filter(
-    d => d.timestamp >= baseTime && d.timestamp < baseTime + 10000
-  );
+  const dialogue = node.dialogues[dialogueIndex];
+  if (!dialogue) return;
+  
+  const fullText = dialogue.text;
+  const totalTypingDuration = calculateTotalTypingDuration(fullText, charDelay);
+  
+  const relevantDanmakus = node.danmakus.filter(d => {
+    if (d.dialogueIndex !== undefined) {
+      return d.dialogueIndex === dialogueIndex;
+    }
+    const baseTime = dialogueIndex * 10000;
+    return d.timestamp >= baseTime && d.timestamp < baseTime + 10000;
+  });
   
   relevantDanmakus.forEach(danmaku => {
-    const delay = Math.max(0, danmaku.timestamp - baseTime);
+    let delay: number;
+    
+    if (danmaku.dialogueIndex !== undefined && danmaku.relativeMs !== undefined) {
+      delay = Math.max(0, danmaku.relativeMs);
+    } else if (danmaku.dialogueIndex !== undefined) {
+      const progress = (danmaku.timestamp % 10000) / 10000;
+      delay = Math.max(0, progress * totalTypingDuration);
+    } else {
+      const baseTime = dialogueIndex * 10000;
+      delay = Math.max(0, danmaku.timestamp - baseTime);
+    }
+    
     const timeout = window.setTimeout(() => {
       addDanmaku(danmaku);
       
@@ -149,6 +188,30 @@ export function triggerDanmakusForDialogue(dialogueIndex: number): void {
       }, 8000);
     }, delay);
     danmakuTimeouts.push(timeout);
+  });
+}
+
+export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, charDelay: number = 50): void {
+  const node = getCurrentNode();
+  if (!node?.danmakus) return;
+  
+  const dialogue = node.dialogues[dialogueIndex];
+  if (!dialogue) return;
+  
+  const elapsedMs = calculateCharTime(dialogue.text, charIndex, charDelay);
+  const tolerance = charDelay * 3;
+  
+  const dueDanmakus = node.danmakus.filter(d => {
+    if (d.dialogueIndex !== dialogueIndex) return false;
+    const targetMs = d.relativeMs !== undefined ? d.relativeMs : (d.timestamp % 10000);
+    return Math.abs(targetMs - elapsedMs) <= tolerance;
+  });
+  
+  dueDanmakus.forEach(danmaku => {
+    addDanmaku(danmaku);
+    window.setTimeout(() => {
+      removeDanmaku(danmaku.id);
+    }, 8000);
   });
 }
 

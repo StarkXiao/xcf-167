@@ -1,20 +1,71 @@
 <script lang="ts">
-  import { onMount, onDestroy, beforeUpdate } from 'svelte';
+  import { onDestroy, createEventDispatcher } from 'svelte';
   import { isTyping } from '../lib/store';
   import { settings } from '../lib/store';
-  import { playSFX } from '../lib/audio';
-  import type { DialogueLine } from '../types/game';
+  import { playSFX, playTypingSound, playBGM } from '../lib/audio';
+  import type { DialogueLine, AudioTrigger } from '../types/game';
 
   export let dialogue: DialogueLine | null;
   export let onComplete: () => void;
 
+  const dispatch = createEventDispatcher<{
+    charTyped: { index: number; char: string };
+    lineStart: { text: string };
+    lineComplete: { text: string };
+  }>();
+
   let displayedText = '';
-  let typingInterval: number | null = null;
   let isComplete = false;
+  let typingTimeouts: number[] = [];
+  let sfxTimeouts: number[] = [];
+  let autoAdvanceTimeout: number | null = null;
+  let firedSfx = new Set<number>();
 
   $: textSpeed = $settings.textSpeed;
 
+  function getCharDelay(mood?: string, baseSpeed?: number): number {
+    const base = baseSpeed !== undefined
+      ? Math.max(15, 100 - baseSpeed)
+      : Math.max(15, 100 - textSpeed);
+    
+    const moodMultipliers: Record<string, number> = {
+      normal: 1.0,
+      tense: 0.7,
+      scared: 1.4,
+      calm: 1.3,
+      whisper: 1.6,
+      urgent: 0.5
+    };
+    
+    return base * (moodMultipliers[mood || 'normal'] || 1.0);
+  }
+
+  function getTypingSoundInterval(mood?: string): number {
+    const intervals: Record<string, number> = {
+      normal: 3,
+      tense: 2,
+      scared: 5,
+      calm: 4,
+      whisper: 8,
+      urgent: 1
+    };
+    return intervals[mood || 'normal'] || 3;
+  }
+
+  function clearAllTimeouts(): void {
+    typingTimeouts.forEach(t => clearTimeout(t));
+    typingTimeouts = [];
+    sfxTimeouts.forEach(t => clearTimeout(t));
+    sfxTimeouts = [];
+    if (autoAdvanceTimeout !== null) {
+      clearTimeout(autoAdvanceTimeout);
+      autoAdvanceTimeout = null;
+    }
+    firedSfx.clear();
+  }
+
   function startTyping() {
+    clearAllTimeouts();
     if (!dialogue) return;
     
     displayedText = '';
@@ -22,38 +73,98 @@
     isTyping.set(true);
     
     const fullText = dialogue.text;
-    let index = 0;
+    const mood = dialogue.mood;
+    const charDelay = getCharDelay(mood, dialogue.baseTypingSpeed);
+    const soundInterval = getTypingSoundInterval(mood);
+    const sfxTriggers = dialogue.sfx || [];
+    const punctuationPause = charDelay * 2.5;
     
-    if (typingInterval) clearInterval(typingInterval);
+    if (dialogue.bgm) {
+      playBGM(dialogue.bgm);
+    }
     
-    const charDelay = Math.max(15, 100 - textSpeed);
+    dispatch('lineStart', { text: fullText });
     
-    typingInterval = window.setInterval(() => {
-      if (index < fullText.length) {
-        displayedText += fullText[index];
-        index++;
-        if (index % 3 === 0 && Math.random() > 0.7) {
-          playSFX('click');
+    sfxTriggers.forEach((trigger: AudioTrigger, triggerIdx: number) => {
+      const sfxDelay = trigger.delay !== undefined
+        ? trigger.delay
+        : (trigger.atCharIndex !== undefined
+          ? calculateCharTime(fullText, trigger.atCharIndex, charDelay, punctuationPause)
+          : 0);
+      
+      const timeout = window.setTimeout(() => {
+        playSFX(trigger.sfx, trigger.volume);
+        firedSfx.add(triggerIdx);
+      }, Math.max(0, sfxDelay));
+      sfxTimeouts.push(timeout);
+    });
+    
+    let cumulativeDelay = 0;
+    for (let i = 0; i < fullText.length; i++) {
+      const char = fullText[i];
+      const timeout = window.setTimeout(() => {
+        displayedText += char;
+        
+        if ((i + 1) % soundInterval === 0) {
+          playTypingSound(mood);
         }
-      } else {
-        completeTyping();
+        
+        dispatch('charTyped', { index: i, char });
+      }, cumulativeDelay);
+      typingTimeouts.push(timeout);
+      
+      cumulativeDelay += charDelay;
+      
+      if (char === '。' || char === '！' || char === '？' || char === '…' || char === '—') {
+        cumulativeDelay += punctuationPause;
+      } else if (char === '，' || char === '、' || char === '；' || char === '：') {
+        cumulativeDelay += charDelay * 1.2;
       }
-    }, charDelay);
+    }
+    
+    const completeTimeout = window.setTimeout(() => {
+      completeTyping();
+    }, cumulativeDelay + 50);
+    typingTimeouts.push(completeTimeout);
+  }
+  
+  function calculateCharTime(text: string, targetIndex: number, charDelay: number, punctuationPause: number): number {
+    let time = 0;
+    for (let i = 0; i < Math.min(targetIndex, text.length); i++) {
+      const char = text[i];
+      time += charDelay;
+      if (char === '。' || char === '！' || char === '？' || char === '…' || char === '—') {
+        time += punctuationPause;
+      } else if (char === '，' || char === '、' || char === '；' || char === '：') {
+        time += charDelay * 1.2;
+      }
+    }
+    return time;
   }
 
   function completeTyping() {
-    if (typingInterval) {
-      clearInterval(typingInterval);
-      typingInterval = null;
-    }
+    clearAllTimeouts();
     if (dialogue) {
       displayedText = dialogue.text;
     }
     isComplete = true;
     isTyping.set(false);
+    
+    dispatch('lineComplete', { text: dialogue?.text || '' });
+    
+    if (dialogue?.autoAdvance) {
+      const delay = dialogue.autoAdvanceDelay || Math.max(1500, dialogue.text.length * 60);
+      autoAdvanceTimeout = window.setTimeout(() => {
+        onComplete();
+      }, delay);
+    }
   }
 
   function handleClick() {
+    if (autoAdvanceTimeout !== null) {
+      clearTimeout(autoAdvanceTimeout);
+      autoAdvanceTimeout = null;
+    }
     if (!isComplete) {
       completeTyping();
     } else {
@@ -66,23 +177,31 @@
   }
 
   onDestroy(() => {
-    if (typingInterval) clearInterval(typingInterval);
+    clearAllTimeouts();
     isTyping.set(false);
   });
 </script>
 
-<div class="dialogue-box" on:click={handleClick}>
+<div class="dialogue-box" on:click={handleClick} role="button" tabindex="0" on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}>
   {#if dialogue}
     {#if dialogue.speaker}
-      <div class="speaker-name">{dialogue.speaker}</div>
+      <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'}>
+        {dialogue.speaker}
+      </div>
     {/if}
-    <div class="dialogue-text">
+    <div 
+      class="dialogue-text"
+      class:tense-text={dialogue.mood === 'tense'}
+      class:scared-text={dialogue.mood === 'scared'}
+      class:whisper-text={dialogue.mood === 'whisper'}
+      class:urgent-text={dialogue.mood === 'urgent'}
+    >
       {displayedText}
       {#if !isComplete}
         <span class="cursor">|</span>
       {/if}
     </div>
-    {#if isComplete}
+    {#if isComplete && !dialogue.autoAdvance}
       <div class="advance-hint">
         <span class="hint-arrow">▼</span>
       </div>
@@ -101,6 +220,7 @@
     min-height: 35%;
     z-index: 30;
     cursor: pointer;
+    outline: none;
   }
 
   .speaker-name {
@@ -115,6 +235,25 @@
     letter-spacing: 0.05em;
     border: 1px solid rgba(100, 180, 255, 0.4);
     border-bottom: none;
+    transition: all 0.3s;
+  }
+
+  .speaker-name.tense {
+    background: linear-gradient(135deg, rgba(180, 60, 60, 0.8), rgba(140, 40, 40, 0.8));
+    border-color: rgba(255, 100, 100, 0.5);
+    color: #ffd0d0;
+  }
+
+  .speaker-name.scared {
+    background: linear-gradient(135deg, rgba(100, 60, 140, 0.7), rgba(70, 40, 110, 0.7));
+    border-color: rgba(180, 120, 255, 0.4);
+    color: #d8c0ff;
+  }
+
+  .speaker-name.whisper {
+    background: linear-gradient(135deg, rgba(80, 80, 80, 0.7), rgba(50, 50, 50, 0.7));
+    border-color: rgba(150, 150, 150, 0.3);
+    color: #c0c0c0;
   }
 
   .dialogue-text {
@@ -129,6 +268,26 @@
     white-space: pre-wrap;
     word-break: break-word;
     backdrop-filter: blur(10px);
+    transition: color 0.3s;
+  }
+
+  .tense-text {
+    color: #ffc0c0;
+  }
+
+  .scared-text {
+    color: #c8b0e8;
+    font-style: italic;
+  }
+
+  .whisper-text {
+    color: #a0a0a0;
+    font-size: 0.9rem;
+  }
+
+  .urgent-text {
+    color: #ffe0a0;
+    font-weight: 500;
   }
 
   .cursor {
