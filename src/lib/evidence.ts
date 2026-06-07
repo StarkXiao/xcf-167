@@ -352,3 +352,73 @@ export function getRuleById(ruleId: string) {
 export function getAllRules() {
   return deductionRules;
 }
+
+export function getPredictedEnding(): string | null {
+  const state = get(evidenceBoard);
+  const weights = [...state.endingWeights].sort((a, b) => b.weight - a.weight);
+  const totalWeight = weights.reduce((sum, w) => sum + Math.max(0, w.weight), 0);
+  if (totalWeight <= 0) return null;
+  return weights[0].endingId;
+}
+
+export function getEndingWeight(endingId: string): number {
+  const state = get(evidenceBoard);
+  const ew = state.endingWeights.find(w => w.endingId === endingId);
+  return ew ? ew.weight : 0;
+}
+
+export function getAllEndingWeights(): { endingId: string; weight: number; probability: number }[] {
+  const state = get(evidenceBoard);
+  const totalWeight = state.endingWeights.reduce((sum, w) => sum + Math.max(0, w.weight), 0);
+  if (totalWeight <= 0) {
+    return state.endingWeights.map(w => ({
+      endingId: w.endingId,
+      weight: w.weight,
+      probability: 1 / state.endingWeights.length
+    }));
+  }
+  return state.endingWeights
+    .map(w => ({
+      endingId: w.endingId,
+      weight: w.weight,
+      probability: Math.max(0, w.weight) / totalWeight
+    }))
+    .sort((a, b) => b.probability - a.probability);
+}
+
+export function selectWeightedEnding(candidateEndingIds?: string[]): string | null {
+  const allWeights = getAllEndingWeights();
+  let candidates = allWeights;
+  if (candidateEndingIds && candidateEndingIds.length > 0) {
+    candidates = allWeights.filter(w => candidateEndingIds.includes(w.endingId));
+  }
+  if (candidates.length === 0) return null;
+
+  const totalProb = candidates.reduce((sum, c) => sum + c.probability, 0);
+  if (totalProb <= 0) {
+    return candidates[0].endingId;
+  }
+
+  let roll = Math.random() * totalProb;
+  for (const candidate of candidates) {
+    roll -= candidate.probability;
+    if (roll <= 0) {
+      return candidate.endingId;
+    }
+  }
+  return candidates[candidates.length - 1].endingId;
+}
+
+export function addEndingWeightModifier(endingId: string, modifier: number, source: string): void {
+  evidenceBoard.update(state => ({
+    ...state,
+    endingWeights: state.endingWeights.map(ew => {
+      if (ew.endingId !== endingId) return ew;
+      return {
+        ...ew,
+        weight: ew.weight + modifier,
+        modifiers: [...ew.modifiers, { source, value: modifier }]
+      };
+    })
+  }));
+}

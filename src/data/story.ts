@@ -641,10 +641,70 @@ export const nodes: StoryNode[] = [
         mood: 'scared'
       })
     ],
+    nextNodeId: 'ending_resolve_live'
+  },
+  {
+    id: 'ending_resolve_live',
+    title: '【命运裁定】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '信号中断的瞬间，你的意识开始恍惚...', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      })
+    ],
+    nextNodeId: 'ending_truth_node'
+  },
+  {
+    id: 'ending_truth_node',
+    title: '【深海真相】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '你拼凑出了所有线索，揭开了海底的秘密。\n直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      })
+    ],
     isEnding: true,
     endingId: 'ending_truth',
     endingTitle: '深海真相',
     endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。'
+  },
+  {
+    id: 'ending_madness_node',
+    title: '【深渊回响】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '当你终于看清海底那东西的轮廓时，你开始怀疑——', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '究竟是他们疯了，还是你疯了？', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '那些弹幕，真的是观众发的吗？', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('', '你一遍又一遍地回放那帧画面——\n\n深渊号AI系统发来的弹幕上，显示的发送时间，\n\n比直播开始的时间，还要早两个小时。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.8 }, { sfx: 'whisper', delay: 1000, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_madness',
+    endingTitle: '深渊回响',
+    endingDescription: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？'
   },
   {
     id: 'path_stop',
@@ -728,10 +788,20 @@ export const nodes: StoryNode[] = [
         mood: 'calm'
       })
     ],
-    choices: [
-      { id: 'c_trust_su', text: '相信苏博士的计划', nextNodeId: 'ending_survival', effect: { full_trust: true } },
-      { id: 'c_doubt', text: '他们在隐瞒更多东西...', nextNodeId: 'ending_loop', condition: { clue_danmaku_deep: true }, effect: { doubt: true } }
-    ]
+    nextNodeId: 'ending_resolve_stop'
+  },
+  {
+    id: 'ending_resolve_stop',
+    title: '【命运裁定】',
+    background: 'dark',
+    dialogues: [
+      mkLine('', '协议07的频率在深海中回响...', {
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      })
+    ],
+    nextNodeId: 'ending_survival'
   },
   {
     id: 'ending_survival',
@@ -874,8 +944,33 @@ export const nodes: StoryNode[] = [
       mkLine('', '深度1000米。\n雷达显示海面有救援船只接近。\n但画面中，四个人的状态越来越差。', {
         sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.5 }],
         mood: 'calm'
+      })
+    ],
+    nextNodeId: 'ending_resolve_ascent'
+  },
+  {
+    id: 'ending_resolve_ascent',
+    title: '【命运裁定】',
+    background: 'escape',
+    dialogues: [
+      mkLine('', '救援船只的信号越来越近...', {
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      })
+    ],
+    nextNodeId: 'ending_survival'
+  },
+  {
+    id: 'ending_silence',
+    title: '【永远的沉默】',
+    background: 'dark',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('', '你在后续的新闻中看到：深渊号船员被成功救起，但四人全部陷入深度昏迷。', {
+        mood: 'calm'
       }),
-      mkLine('', '你在后续的新闻中看到：深渊号船员被成功救起，但四人全部陷入深度昏迷。\n其中一人再也没有醒来。\n他们在昏迷前说的话，被官方判定为减压病导致的幻觉。', {
+      mkLine('', '其中一人再也没有醒来。\n他们在昏迷前说的话，被官方判定为减压病导致的幻觉。', {
         mood: 'calm'
       }),
       mkLine('', '但你知道真相。\n而现在，知道真相的人，又多了你一个。', {

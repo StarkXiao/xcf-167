@@ -13,6 +13,7 @@ import {
   isTyping
 } from './store';
 import { get } from 'svelte/store';
+import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier } from './evidence';
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -92,9 +93,39 @@ export function advance(): void {
     }
     
     if (node.nextNodeId) {
-      goToNode(node.nextNodeId);
+      const redirectedNodeId = resolveEndingRedirect(node.id, node.nextNodeId);
+      goToNode(redirectedNodeId);
     }
   }
+}
+
+function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
+  const endingRedirectMap: Record<string, string[]> = {
+    live_continue: ['ending_truth', 'ending_madness'],
+    ascent_ending: ['ending_survival', 'ending_silence', 'ending_truth'],
+    stop_continue: ['ending_survival', 'ending_loop', 'ending_madness'],
+    ending_path_live: ['ending_truth', 'ending_madness'],
+    ending_resolve_live: ['ending_truth', 'ending_madness'],
+    ending_resolve_ascent: ['ending_survival', 'ending_silence', 'ending_truth'],
+    ending_resolve_stop: ['ending_survival', 'ending_loop', 'ending_madness']
+  };
+
+  if (endingRedirectMap[currentNodeId]) {
+    const candidates = endingRedirectMap[currentNodeId];
+    const weightedEnding = selectWeightedEnding(candidates);
+    if (weightedEnding) {
+      const endingNodeMap: Record<string, string> = {
+        ending_truth: 'ending_truth_node',
+        ending_survival: 'ending_survival',
+        ending_silence: 'ending_silence',
+        ending_madness: 'ending_madness_node',
+        ending_loop: 'ending_loop'
+      };
+      return endingNodeMap[weightedEnding] || nextNodeId;
+    }
+  }
+
+  return nextNodeId;
 }
 
 export function selectChoice(choiceId: string): void {
@@ -107,8 +138,41 @@ export function selectChoice(choiceId: string): void {
   if (choice.effect) {
     applyEffect(choice.effect);
   }
+
+  applyChoiceWeightModifier(node.id, choiceId);
   
   goToNode(choice.nextNodeId);
+}
+
+function applyChoiceWeightModifier(nodeId: string, choiceId: string): void {
+  const weightMap: Record<string, Record<string, Record<string, number>>> = {
+    intro_2: {
+      c_fast: { ending_truth: -10, ending_loop: 10 },
+      c_normal: { ending_truth: 10, ending_survival: 5 }
+    },
+    first_contact: {
+      c_stay: { ending_survival: 10, ending_truth: 5 },
+      c_danmaku: { ending_truth: 15, ending_madness: 5 },
+      c_creature: { ending_truth: 20, ending_madness: 10, ending_silence: 5 }
+    },
+    critical_choice: {
+      c_keep_live: { ending_truth: 25, ending_madness: 15, ending_silence: 10 },
+      c_keep_live_2: { ending_truth: 20, ending_madness: 10 },
+      c_stop_live: { ending_survival: 25, ending_loop: 10 },
+      c_emergency: { ending_survival: 15, ending_silence: 20, ending_truth: 5 }
+    },
+    stop_continue: {
+      c_trust_su: { ending_survival: 30, ending_silence: -10 },
+      c_doubt: { ending_loop: 30, ending_truth: 10, ending_madness: 10 }
+    }
+  };
+
+  const modifiers = weightMap[nodeId]?.[choiceId];
+  if (modifiers) {
+    Object.entries(modifiers).forEach(([endingId, value]) => {
+      addEndingWeightModifier(endingId, value, `choice:${nodeId}:${choiceId}`);
+    });
+  }
 }
 
 export function goToNode(nodeId: string): void {
