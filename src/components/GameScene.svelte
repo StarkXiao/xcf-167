@@ -7,6 +7,7 @@
   import ChoicePanel from './ChoicePanel.svelte';
   import GameMenu from './GameMenu.svelte';
   import EndingScreen from './EndingScreen.svelte';
+  import EvidenceBoard from './EvidenceBoard.svelte';
   import {
     gameState,
     activeDanmakus,
@@ -16,6 +17,15 @@
     resetGameState,
     settings
   } from '../lib/store';
+  import {
+    evidenceBoard,
+    collectEvidenceByNode,
+    openEvidenceBoard,
+    closeEvidenceBoard,
+    resetEvidenceBoard,
+    setCanOpenBoard,
+    collectAllEvidence
+  } from '../lib/evidence';
   import {
     getCurrentNode,
     getAvailableChoices,
@@ -43,10 +53,19 @@
   let isEnding = false;
   let currentEnding: Ending | null = null;
   let showGameMenu = false;
+  let lastNodeId = '';
 
   function updateState() {
     currentNode = getCurrentNode();
     if (!currentNode) return;
+
+    if (currentNode.id !== lastNodeId) {
+      collectEvidenceByNode(currentNode.id);
+      lastNodeId = currentNode.id;
+      if (currentNode.id === 'intro_1') {
+        setCanOpenBoard(true);
+      }
+    }
 
     const state = get(gameState);
     if (state.dialogueIndex < currentNode.dialogues.length) {
@@ -144,9 +163,17 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      showGameMenu = !showGameMenu;
+      if ($evidenceBoard.isBoardOpen) {
+        closeEvidenceBoard();
+      } else {
+        showGameMenu = !showGameMenu;
+      }
+    } else if (e.key === 'e' || e.key === 'E') {
+      if ($evidenceBoard.canOpenBoard && !isEnding && !showGameMenu) {
+        openEvidenceBoard();
+      }
     } else if (e.key === ' ' || e.key === 'Enter') {
-      if (!showChoices && !isEnding && !showGameMenu) {
+      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu) {
         e.preventDefault();
         handleDialogueComplete();
       }
@@ -160,8 +187,10 @@
   function handleLoadSlot(slot: SaveSlot) {
     clearDanmakuTimeouts();
     loadState(slot.state);
+    resetEvidenceBoard();
     isEnding = false;
     currentEnding = null;
+    lastNodeId = '';
     updateState();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
@@ -170,8 +199,10 @@
   function handleRestart() {
     clearDanmakuTimeouts();
     resetGameState();
+    resetEvidenceBoard();
     isEnding = false;
     currentEnding = null;
+    lastNodeId = '';
     goToNode('start');
     updateState();
     triggerDanmakusForDialogue(0);
@@ -185,6 +216,9 @@
   onMount(() => {
     initAudio();
     resumeAudio();
+    resetEvidenceBoard();
+    collectAllEvidence();
+    setCanOpenBoard(true);
     updateState();
     playBGM('deep');
     triggerDanmakusForDialogue(get(gameState).dialogueIndex);
@@ -229,12 +263,21 @@
     />
   {/if}
 
-  {#if !isEnding && !showGameMenu}
+  {#if !isEnding && !showGameMenu && $evidenceBoard.canOpenBoard}
     <button 
       class="menu-toggle"
       on:click|stopPropagation={() => { playSFX('click'); showGameMenu = true; }}
     >
       ☰
+    </button>
+    <button 
+      class="evidence-toggle"
+      on:click|stopPropagation={() => { playSFX('notify'); openEvidenceBoard(); }}
+    >
+      🔍
+      {#if $evidenceBoard.collectedEvidence.length > 0}
+        <span class="evidence-badge">{$evidenceBoard.collectedEvidence.length}</span>
+      {/if}
     </button>
   {/if}
 
@@ -244,6 +287,10 @@
     onLoadSlot={handleLoadSlot}
     onBackToMenu={() => { clearDanmakuTimeouts(); stopBGM(); onBackToMenu(); }}
   />
+
+  {#if $evidenceBoard.isBoardOpen}
+    <EvidenceBoard onClose={() => {}} />
+  {/if}
 </div>
 
 <style>
@@ -299,6 +346,49 @@
     border-color: rgba(100, 180, 255, 0.6);
   }
 
+  .evidence-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 64px;
+    width: 40px;
+    height: 40px;
+    background: rgba(20, 50, 40, 0.6);
+    border: 1px solid rgba(100, 255, 150, 0.3);
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .evidence-toggle:hover, .evidence-toggle:active {
+    background: rgba(40, 100, 70, 0.8);
+    border-color: rgba(100, 255, 150, 0.6);
+    box-shadow: 0 0 12px rgba(100, 255, 150, 0.3);
+  }
+
+  .evidence-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ff6464, #ff3232);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 6px rgba(255, 100, 100, 0.5);
+  }
+
   @media (max-width: 480px) {
     .title-text {
       font-size: 0.7rem;
@@ -307,6 +397,13 @@
     .menu-toggle {
       width: 36px;
       height: 36px;
+      font-size: 1rem;
+    }
+
+    .evidence-toggle {
+      width: 36px;
+      height: 36px;
+      right: 56px;
       font-size: 1rem;
     }
   }

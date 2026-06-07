@@ -98,3 +98,86 @@ export interface SaveSlot {
 }
 
 export type GameScene = 'menu' | 'playing' | 'endings' | 'settings';
+
+export type EvidenceType = 'danmaku' | 'dialogue' | 'sfx';
+
+export type EvidenceStatus = 'collected' | 'placed' | 'used' | 'invalid';
+
+export interface EvidenceCard {
+  id: string;
+  type: EvidenceType;
+  title: string;
+  content: string;
+  sourceNodeId?: string;
+  sourceDialogueIndex?: number;
+  color?: string;
+  username?: string;
+  speaker?: string;
+  sfxType?: string;
+  status: EvidenceStatus;
+  importance: number;
+  tags: string[];
+  collectedAt: number;
+}
+
+export interface EvidenceSlot {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  requiredTags?: string[];
+  filledBy?: string;
+  order: number;
+}
+
+export interface DeductionRule {
+  id: string;
+  name: string;
+  description: string;
+  requiredSlots: string[];
+  requiredEvidence: { slotId: string; evidenceId: string }[];
+  outcome: {
+    clueUnlocked?: string;
+    endingWeights?: Record<string, number>;
+    isCorrect: boolean;
+    feedback: string;
+  };
+}
+
+export interface EvidenceHistory {
+  ruleId: string;
+  evidenceIds: string[];
+  isCorrect: boolean;
+  timestamp: number;
+  feedback: string;
+}
+
+export interface EndingWeight {
+  endingId: string;
+  weight: number;
+  baseWeight: number;
+  modifiers: { source: string; value: number }[];
+}
+
+export interface EvidenceBoardState {
+  collectedEvidence: EvidenceCard[];
+  slots: EvidenceSlot[];
+  placedEvidence: Map<string, string>;
+  unlockedRules: string[];
+  completedRules: string[];
+  history: EvidenceHistory[];
+  mistakeCount: number;
+  maxMistakes: number;
+  endingWeights: EndingWeight[];
+  isBoardOpen: boolean;
+  canOpenBoard: boolean;
+}
+
+export interface DragState {
+  isDragging: boolean;
+  evidenceId: string | null;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
