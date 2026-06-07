@@ -14,6 +14,7 @@ export interface Choice {
   text: string;
   nextNodeId: string;
   condition?: StateCondition;
+  trustCondition?: TrustCondition;
   effect?: StateEffect;
   trustEffect?: TrustEffect;
   memoryCondition?: MemoryCondition;
@@ -50,6 +51,7 @@ export interface AudioTrigger {
 export interface DialogueVariant {
   text: string;
   condition?: StateCondition;
+  trustCondition?: TrustCondition;
   memoryCondition?: MemoryCondition;
   isNewGamePlus?: boolean;
 }
@@ -99,8 +101,10 @@ export interface StoryNode {
   danmakus?: Danmaku[];
   choices?: Choice[];
   nextNodeId?: string;
+  nextNodeBranches?: NextNodeBranch[];
   effects?: StateEffect;
   trustEffect?: TrustEffect;
+  trustCondition?: TrustCondition;
   isEnding?: boolean;
   endingId?: string;
   endingTitle?: string;
@@ -307,6 +311,28 @@ export interface TrustNotification {
 export interface TrustEffect {
   changes: TrustChange[];
   hintText?: string;
+}
+
+export interface CrewTrustRequirement {
+  memberId: CrewMemberId;
+  minValue?: number;
+  maxValue?: number;
+  minLevel?: TrustLevel;
+}
+
+export interface TrustCondition {
+  crewRequirements?: CrewTrustRequirement[];
+  overallMinValue?: number;
+  overallMaxValue?: number;
+  overallMinLevel?: TrustLevel;
+}
+
+export interface NextNodeBranch {
+  nextNodeId: string;
+  condition?: StateCondition;
+  trustCondition?: TrustCondition;
+  memoryCondition?: MemoryCondition;
+  priority?: number;
 }
 
 

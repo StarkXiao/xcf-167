@@ -708,8 +708,174 @@ export const nodes: StoryNode[] = [
           ],
           hintText: '船员们似乎意识到...你并不是第一次来到这里'
         }
+      },
+      {
+        id: 'c_trust_suboshi_reveal',
+        text: '私下问苏博士：「你是不是早就知道它的存在？」（需苏博士信任）',
+        nextNodeId: 'trust_suboshi_reveal',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minLevel: 'trust' }]
+        },
+        effect: { path: 'live', trust_su_deep: true, clue_count: 4 },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 15, reason: '坦诚相对' },
+            { target: 'laozhou', value: 10, reason: '理解处境' }
+          ],
+          hintText: '苏博士感受到你的善意，决定向你坦白'
+        }
+      },
+      {
+        id: 'c_trust_laozhou_plan',
+        text: '听老周的Plan B：「有一条只有工程师知道的紧急通道」（需老周信任）',
+        nextNodeId: 'trust_laozhou_plan',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'laozhou', minLevel: 'trust' }]
+        },
+        effect: { path: 'ascent', trust_zhou_deep: true, clue_count: 4 },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 20, reason: '信任其秘密方案' },
+            { target: 'xiaolin', value: 10, reason: '更安全的选择' }
+          ],
+          hintText: '老周点头，带你看他从未告诉过任何人的后手'
+        }
+      },
+      {
+        id: 'c_trust_ahai_confront',
+        text: '直接质问阿海：「你是不是在隐瞒合同的真相？」（需阿海怀疑度低）',
+        nextNodeId: 'trust_ahai_confront',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'ahai', maxValue: -20 }]
+        },
+        effect: { path: 'live', ahai_confession: true, clue_count: 5 },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -25, reason: '被戳破谎言' },
+            { target: 'xiaolin', value: -15, reason: '怀疑阿海' },
+            { target: 'suboshi', value: 10, reason: '站在真相一边' }
+          ],
+          hintText: '你直接戳破了阿海一直回避的问题'
+        }
       }
     ]
+  },
+  {
+    id: 'trust_suboshi_reveal',
+    title: '【苏博士的坦白】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('苏博士', '（低声）你...你是个聪明人。', {
+        mood: 'whisper'
+      }),
+      mkLine('苏博士', '我确实知道。这不是第一次出现这种信号了。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '三年前的「先驱者号」事故...官方说是机械故障。但我看到了同一段录像。', {
+        mood: 'calm'
+      }),
+      mkLine('苏博士', '那个东西...它不是生物。它是某种观测装置。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '关掉直播吧。不是为了掩盖什么——是为了让它失去继续观测的理由。', {
+        mood: 'urgent'
+      }),
+      mkLine('', '你获得了关键线索：「先驱者号事故」和「人造观测体」。', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
+    nextNodeId: 'path_stop',
+    effects: { clue_previous_incident: true, clue_creature_artificial: true, full_truth: true },
+    trustEffect: {
+      changes: [{ target: 'suboshi', value: 10, reason: '分享秘密' }]
+    }
+  },
+  {
+    id: 'trust_laozhou_plan',
+    title: '【老周的后手】',
+    background: 'damage',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('老周', '（压低声音）我在造这艘艇的时候...留了一手。', {
+        mood: 'whisper'
+      }),
+      mkLine('老周', '外层抗压壳的第三舱段有一个独立的紧急上浮舱，可以脱离主艇体。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('老周', '只能坐两个人。我让阿海和小林先走——', {
+        mood: 'tense'
+      }),
+      mkLine('阿海', '不可能！我们一起走！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '（看向你）观众还在看。总得有人留下来撑到最后一秒。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'calm'
+      }),
+      mkLine('老周', '我和苏博士留下。你们三个走。这是命令。', {
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      })
+    ],
+    nextNodeId: 'path_ascent',
+    effects: { clue_engineer_secret: true, path: 'ascent', trust_zhou: true },
+    trustEffect: {
+      changes: [
+        { target: 'laozhou', value: 15, reason: '承担风险' },
+        { target: 'xiaolin', value: 10, reason: '有了生路' },
+        { target: 'ahai', value: 5, reason: '被拯救' }
+      ]
+    }
+  },
+  {
+    id: 'trust_ahai_confront',
+    title: '【阿海的崩溃】',
+    background: 'glitch',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('阿海', '...你说什么？', {
+        mood: 'scared'
+      }),
+      mkLine('', '你盯着屏幕里那张苍白的脸，一字一句地说出那个你一直回避的词：「协议07」。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }],
+        mood: 'tense'
+      }),
+      mkLine('阿海', '（手抖了）你怎么...你怎么可能知道——', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（猛地转头）阿海，你签了什么？！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '不是我想的...是合同...公司说只要配合直播，出了事他们——', {
+        mood: 'scared'
+      }),
+      mkLine('老周', '（一拳砸在控制台）妈的！协议07是「死亡直播条款」！我们是被故意派下来的！', {
+        sfx: [{ sfx: 'metal_crash', delay: 0, volume: 0.9 }, { sfx: 'alarm', delay: 200, volume: 0.8 }],
+        mood: 'urgent',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'path_live',
+    effects: { clue_protocol07: true, full_truth: true, clue_count: 6 },
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -20, reason: '谎言被戳破' },
+        { target: 'suboshi', value: 15, reason: '站在同一边' },
+        { target: 'laozhou', value: 10, reason: '真相大白' }
+      ]
+    }
   },
   {
     id: 'path_live',
@@ -798,8 +964,101 @@ export const nodes: StoryNode[] = [
         mood: 'scared'
       })
     ],
+    effects: { saw_eye: true },
+    nextNodeBranches: [
+      {
+        nextNodeId: 'live_truth_branch',
+        priority: 10,
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minValue: 40 }]
+        }
+      },
+      {
+        nextNodeId: 'live_madness_branch',
+        priority: 8,
+        trustCondition: {
+          crewRequirements: [{ memberId: 'ahai', maxValue: -40 }]
+        }
+      },
+      {
+        nextNodeId: 'ending_path_live',
+        priority: 0
+      }
+    ]
+  },
+  {
+    id: 'live_truth_branch',
+    title: '【直播继续 · 真相线】',
+    background: 'damage',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('苏博士', '（突然抓住镜头）你！看回放的人！你能听到我吗？！', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('苏博士', '如果你还在看，记住——协议07是诱饵！他们故意派我们下来！', {
+        mood: 'scared'
+      }),
+      mkLine('老周', '苏博士！你在跟谁说话？！', {
+        mood: 'urgent'
+      }),
+      mkLine('苏博士', '那个东西不是生物！它是协议07的「验收机制」！它在测试我们是否——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.8 }],
+        mood: 'scared'
+      }),
+      mkLine('', '信号剧烈波动。你获得了【协议07的验收机制】关键线索。', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
     nextNodeId: 'ending_path_live',
-    effects: { saw_eye: true }
+    effects: { clue_acceptance_mechanism: true, full_truth: true },
+    trustEffect: {
+      changes: [{ target: 'suboshi', value: 10, reason: '获得真相' }]
+    }
+  },
+  {
+    id: 'live_madness_branch',
+    title: '【直播继续 · 疯狂线】',
+    background: 'glitch',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('阿海', '（对着镜头诡笑）你一直在看，对吧？每一次。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'whisper'
+      }),
+      mkLine('小林', '阿海...你在说什么？', {
+        mood: 'scared'
+      }),
+      mkLine('阿海', '他不是第一次看到这些了。对吧？「观众」？', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '你以为你在选择我们的命运？其实是你每次都选了让我们死得更惨的那条路。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.8 }],
+        mood: 'tense'
+      }),
+      mkLine('老周', '阿海你疯了！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '我没疯。我只是终于明白了——我们都只是他循环播放里的演员而已。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.7 }, { sfx: 'static', delay: 500, volume: 0.8 }],
+        mood: 'whisper',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'ending_path_live',
+    effects: { clue_loop_awareness: true, clue_count: 7 },
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -20, reason: '觉醒疯狂' },
+        { target: 'xiaolin', value: -15, reason: '被恐惧感染' }
+      ]
+    }
   },
   {
     id: 'ending_path_live',
@@ -1002,6 +1261,9 @@ export const nodes: StoryNode[] = [
         text: '相信苏博士的计划',
         nextNodeId: 'ending_resolve_stop',
         effect: { full_trust: true },
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minValue: 10 }]
+        },
         trustEffect: {
           changes: [
             { target: 'suboshi', value: 30, reason: '完全信任' },
@@ -1013,10 +1275,29 @@ export const nodes: StoryNode[] = [
         }
       },
       {
+        id: 'c_trust_su_low',
+        text: '勉强同意配合苏博士',
+        nextNodeId: 'ending_resolve_stop',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', maxValue: 9 }]
+        },
+        effect: { trust_weak: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 5, reason: '勉强配合' },
+            { target: 'laozhou', value: 5, reason: '勉强配合' }
+          ],
+          hintText: '你不太信任他们，但眼下没有更好的选择'
+        }
+      },
+      {
         id: 'c_doubt',
         text: '他们在隐瞒更多东西...',
         nextNodeId: 'ending_resolve_stop',
         condition: { clue_danmaku_deep: true },
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', maxValue: 0 }]
+        },
         effect: { doubt: true },
         trustEffect: {
           changes: [
@@ -1027,8 +1308,58 @@ export const nodes: StoryNode[] = [
           ],
           hintText: '你确信他们隐瞒了更多真相'
         }
+      },
+      {
+        id: 'c_trust_xiaolin_secret',
+        text: '小林一直在沉默...也许她知道更多？（需小林怀疑度低）',
+        nextNodeId: 'stop_xiaolin_branch',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'xiaolin', maxValue: -10 }]
+        },
+        effect: { clue_count: 5 },
+        trustEffect: {
+          changes: [
+            { target: 'xiaolin', value: -20, reason: '被质问' },
+            { target: 'suboshi', value: -10, reason: '团队分裂' },
+            { target: 'ahai', value: -5, reason: '团队分裂' }
+          ],
+          hintText: '你转向了一直沉默的小林'
+        }
       }
     ]
+  },
+  {
+    id: 'stop_xiaolin_branch',
+    title: '【小林的秘密】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你把注意力转向小林——那个从刚才就一直沉默不语的摄影师。', {
+        mood: 'calm'
+      }),
+      mkLine('小林', '...别盯着我看。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '你回放慢动作。镜头的反光中，你看到小林的手在抖——不是因为害怕。\n是因为她在偷偷关掉舱内录音的开关。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '（声音颤抖）你以为你在看真相？...那你想过没有，为什么苏博士一定要找我当摄影师？', {
+        mood: 'whisper'
+      }),
+      mkLine('小林', '因为三年前的先驱者号...我也在上面。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.9 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'ending_resolve_stop',
+    effects: { clue_xiaolin_secret: true, full_truth: true, clue_count: 7 },
+    trustEffect: {
+      changes: [{ target: 'xiaolin', value: 5, reason: '说出真相' }]
+    }
   },
   {
     id: 'ending_resolve_stop',

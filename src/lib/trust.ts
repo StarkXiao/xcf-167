@@ -6,7 +6,8 @@ import type {
   TrustChange,
   TrustState,
   TrustEffect,
-  TrustNotification
+  TrustNotification,
+  TrustCondition
 } from '../types/game';
 
 export const CREW_MEMBERS: CrewMember[] = [
@@ -198,7 +199,7 @@ function removeExpiredNotifications(): void {
   }));
 }
 
-export function checkTrustCondition(
+export function checkCrewTrustRequirement(
   memberId: CrewMemberId,
   minLevel?: TrustLevel,
   minValue?: number
@@ -268,4 +269,68 @@ export function resetTrustState(): void {
 
 export function getCrewMember(id: CrewMemberId): CrewMember | undefined {
   return CREW_MEMBERS.find(m => m.id === id);
+}
+
+export function checkTrustCondition(condition: TrustCondition | undefined): boolean {
+  if (!condition) return true;
+
+  const state = get(trustState);
+  const levelOrder: TrustLevel[] = ['hostile', 'distrust', 'neutral', 'trust', 'loyal'];
+
+  if (condition.overallMinValue !== undefined && state.overallTrust < condition.overallMinValue) {
+    return false;
+  }
+  if (condition.overallMaxValue !== undefined && state.overallTrust > condition.overallMaxValue) {
+    return false;
+  }
+  if (condition.overallMinLevel !== undefined) {
+    const overallLevel = getTrustLevel(state.overallTrust);
+    const requiredIndex = levelOrder.indexOf(condition.overallMinLevel);
+    const currentIndex = levelOrder.indexOf(overallLevel);
+    if (currentIndex < requiredIndex) return false;
+  }
+
+  if (condition.crewRequirements && condition.crewRequirements.length > 0) {
+    for (const req of condition.crewRequirements) {
+      const crew = state.crew[req.memberId];
+      if (!crew) return false;
+
+      if (req.minValue !== undefined && crew.value < req.minValue) return false;
+      if (req.maxValue !== undefined && crew.value > req.maxValue) return false;
+      if (req.minLevel !== undefined) {
+        const requiredIndex = levelOrder.indexOf(req.minLevel);
+        const currentIndex = levelOrder.indexOf(crew.level);
+        if (currentIndex < requiredIndex) return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+export function getLockedEnding(candidates: string[]): string | null {
+  const state = get(trustState);
+  const suboshiTrust = state.crew.suboshi.value;
+  const laozhouTrust = state.crew.laozhou.value;
+  const ahaiTrust = state.crew.ahai.value;
+  const xiaolinTrust = state.crew.xiaolin.value;
+  const overall = state.overallTrust;
+
+  if (suboshiTrust >= 60 && candidates.includes('ending_truth')) {
+    return 'ending_truth';
+  }
+  if (laozhouTrust >= 60 && candidates.includes('ending_survival')) {
+    return 'ending_survival';
+  }
+  if (ahaiTrust <= -60 && candidates.includes('ending_madness')) {
+    return 'ending_madness';
+  }
+  if (xiaolinTrust <= -60 && candidates.includes('ending_silence')) {
+    return 'ending_silence';
+  }
+  if (overall <= -60 && candidates.includes('ending_loop')) {
+    return 'ending_loop';
+  }
+
+  return null;
 }

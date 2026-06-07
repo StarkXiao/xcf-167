@@ -36,7 +36,8 @@ import {
 } from './memory';
 import { playSFX } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
-import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition } from './trust';
+import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition, getLockedEnding } from './trust';
+import type { TrustCondition, NextNodeBranch } from '../types/game';
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -58,8 +59,10 @@ export function checkCondition(condition?: StateCondition): boolean {
 
 export function checkAllConditions(
   stateCondition?: StateCondition,
-  memoryCondition?: MemoryCondition
+  memoryCondition?: MemoryCondition,
+  trustCondition?: TrustCondition
 ): boolean {
+  if (!checkTrustCondition(trustCondition)) return false;
   const memoryOk = checkMemoryCondition(memoryCondition);
   if (memoryCondition && memoryOk) {
     return true;
@@ -77,7 +80,7 @@ export function applyEffect(effect?: StateEffect): void {
 export function getAvailableChoices(): Choice[] {
   const node = getCurrentNode();
   if (!node?.choices) return [];
-  return node.choices.filter(c => checkAllConditions(c.condition, c.memoryCondition));
+  return node.choices.filter(c => checkAllConditions(c.condition, c.memoryCondition, c.trustCondition));
 }
 
 export function getChoiceDisplayText(choice: Choice): string {
@@ -235,8 +238,9 @@ export function advance(): void {
       return;
     }
     
-    if (node.nextNodeId) {
-      const redirectedNodeId = resolveEndingRedirect(node.id, node.nextNodeId);
+    const effectiveNextId = resolveNextNodeBranches(node, node.nextNodeId);
+    if (effectiveNextId) {
+      const redirectedNodeId = resolveEndingRedirect(node.id, effectiveNextId);
       goToNode(redirectedNodeId);
     }
   }
@@ -261,6 +265,22 @@ function getEvidenceStateIds(): string[] {
   } catch {
     return [];
   }
+}
+
+export function resolveNextNodeBranches(node: StoryNode, defaultNextId?: string): string | undefined {
+  if (!node.nextNodeBranches || node.nextNodeBranches.length === 0) {
+    return defaultNextId;
+  }
+
+  const sorted = [...node.nextNodeBranches].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+  for (const branch of sorted) {
+    if (checkAllConditions(branch.condition, branch.memoryCondition, branch.trustCondition)) {
+      return branch.nextNodeId;
+    }
+  }
+
+  return defaultNextId;
 }
 
 function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
@@ -293,6 +313,12 @@ function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): strin
   const config = endingRedirectMap[currentNodeId];
   if (config) {
     applyTrustEndingWeights(addEndingWeightModifier);
+
+    const locked = getLockedEnding(config.candidates);
+    if (locked) {
+      return config.nodeMap[locked] || nextNodeId;
+    }
+
     const weightedEnding = selectWeightedEnding(config.candidates);
     if (weightedEnding) {
       return config.nodeMap[weightedEnding] || nextNodeId;
@@ -307,7 +333,7 @@ export function selectChoice(choiceId: string): void {
   if (!node?.choices) return;
   
   const choice = node.choices.find(c => c.id === choiceId);
-  if (!choice || !checkAllConditions(choice.condition, choice.memoryCondition)) return;
+  if (!choice || !checkAllConditions(choice.condition, choice.memoryCondition, choice.trustCondition)) return;
   
   if (choice.effect) {
     applyEffect(choice.effect);
