@@ -5,7 +5,8 @@ import { get } from 'svelte/store';
 let audioContext: AudioContext | null = null;
 let bgmGain: GainNode | null = null;
 let sfxGain: GainNode | null = null;
-let bgmNodes: { osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode }[] = [];
+type BGMNode = { osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode };
+let bgmNodes: BGMNode[] = [];
 let noiseBuffer: AudioBuffer | null = null;
 let bgmNoiseNode: AudioBufferSourceNode | null = null;
 let bgmNoiseGain: GainNode | null = null;
@@ -17,11 +18,13 @@ let sfxVolume = 0.5;
 let muted = false;
 let currentBGMType: string | null = null;
 
+const getSafeAudioTime = (): number => audioContext?.currentTime ?? 0;
+
 export function initAudio(): void {
   if (audioContext) return;
   
   try {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     
     bgmGain = audioContext.createGain();
     bgmGain.gain.value = muted ? 0 : bgmVolume;
@@ -53,33 +56,40 @@ export function resumeAudio(): void {
   }
 }
 
-function startCorruptionAudioUpdate() {
+function startCorruptionAudioUpdate(): void {
   if (corruptionUpdateTimer !== null) return;
   corruptionUpdateTimer = window.setInterval(() => {
     if (!audioContext || !bgmGain) return;
     const corruptionLevel = get(signalCorruption).level;
     const params = getAudioDistortionParams(corruptionLevel);
+    const ctx = audioContext;
     
     if (bgmFilter) {
-      bgmFilter.frequency.setValueAtTime(params.filterCutoff, audioContext.currentTime);
+      bgmFilter.frequency.setValueAtTime(params.filterCutoff, ctx.currentTime);
     }
     
     if (bgmNoiseGain) {
-      bgmNoiseGain.gain.setValueAtTime(muted ? 0 : params.noiseAmount, audioContext.currentTime);
+      bgmNoiseGain.gain.setValueAtTime(muted ? 0 : params.noiseAmount, ctx.currentTime);
     }
     
     bgmNodes.forEach(({ osc, lfo, lfoGain }, i) => {
       if (lfo && lfoGain) {
-        const baseLfoRate = currentBGMType === 'tense' ? 0.25 : currentBGMType === 'mystery' ? 0.12 : currentBGMType === 'calm' ? 0.06 : 0.08;
-        lfo.frequency.setValueAtTime(baseLfoRate + i * 0.03 + params.pitchShift * 0.001, audioContext.currentTime);
-        lfoGain.gain.setValueAtTime(0.024 + params.lfoDepth * 0.05, audioContext.currentTime);
+        const baseLfoRate = currentBGMType === 'tense' ? 0.25 
+          : currentBGMType === 'mystery' ? 0.12 
+          : currentBGMType === 'calm' ? 0.06 
+          : 0.08;
+        lfo.frequency.setValueAtTime(baseLfoRate + i * 0.03 + params.pitchShift * 0.001, ctx.currentTime);
+        lfoGain.gain.setValueAtTime(0.024 + params.lfoDepth * 0.05, ctx.currentTime);
       }
-      osc.detune.setValueAtTime(params.pitchShift + Math.sin(Date.now() / 500 + i) * corruptionLevel * 0.05, audioContext.currentTime);
+      osc.detune.setValueAtTime(
+        params.pitchShift + Math.sin(Date.now() / 500 + i) * corruptionLevel * 0.05, 
+        ctx.currentTime
+      );
     });
   }, 100);
 }
 
-function stopCorruptionAudioUpdate() {
+function stopCorruptionAudioUpdate(): void {
   if (corruptionUpdateTimer !== null) {
     clearInterval(corruptionUpdateTimer);
     corruptionUpdateTimer = null;
@@ -93,6 +103,7 @@ export function playBGM(type: BGMType = 'deep'): void {
   stopBGM();
   if (!audioContext || !bgmGain) return;
   
+  const ctx = audioContext;
   const presets: Record<string, { freqs: number[]; lfoRate: number; baseVol: number }> = {
     deep:    { freqs: [43.65, 55, 82.5],       lfoRate: 0.08, baseVol: 0.08 },
     tense:   { freqs: [58.27, 73.42, 110],     lfoRate: 0.25, baseVol: 0.1 },
@@ -102,21 +113,21 @@ export function playBGM(type: BGMType = 'deep'): void {
   
   const preset = presets[type] || presets.deep;
   
-  bgmFilter = audioContext.createBiquadFilter();
+  bgmFilter = ctx.createBiquadFilter();
   bgmFilter.type = 'lowpass';
   bgmFilter.frequency.value = 8000;
   bgmFilter.Q.value = 0.5;
   bgmFilter.connect(bgmGain);
   
-  bgmNoiseGain = audioContext.createGain();
+  bgmNoiseGain = ctx.createGain();
   bgmNoiseGain.gain.value = 0;
   bgmNoiseGain.connect(bgmGain);
   
   if (noiseBuffer) {
-    bgmNoiseNode = audioContext.createBufferSource();
+    bgmNoiseNode = ctx.createBufferSource();
     bgmNoiseNode.buffer = noiseBuffer;
     bgmNoiseNode.loop = true;
-    const noiseFilter = audioContext.createBiquadFilter();
+    const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = 'bandpass';
     noiseFilter.frequency.value = 1500;
     noiseFilter.Q.value = 0.3;
@@ -126,61 +137,72 @@ export function playBGM(type: BGMType = 'deep'): void {
   }
   
   preset.freqs.forEach((freq, i) => {
-    const osc = audioContext!.createOscillator();
-    const gain = audioContext!.createGain();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     
     osc.type = i === 0 ? 'sine' : 'triangle';
     osc.frequency.value = freq;
     gain.gain.value = preset.baseVol / (i + 1);
     
-    const lfo = audioContext!.createOscillator();
-    const lfoGain = audioContext!.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoGainNode = ctx.createGain();
     lfo.frequency.value = preset.lfoRate + i * 0.03;
-    lfoGain.gain.value = preset.baseVol * 0.3;
-    lfo.connect(lfoGain);
-    lfoGain.connect(gain.gain);
+    lfoGainNode.gain.value = preset.baseVol * 0.3;
+    lfo.connect(lfoGainNode);
+    lfoGainNode.connect(gain.gain);
     lfo.start();
     
     osc.connect(gain);
-    gain.connect(bgmFilter!);
+    gain.connect(bgmFilter as BiquadFilterNode);
     osc.start();
     
-    bgmNodes.push({ osc, gain, lfo, lfoGain });
+    bgmNodes.push({ osc, gain, lfo, lfoGain: lfoGainNode });
   });
   
   startCorruptionAudioUpdate();
 }
 
+function stopSingleNode(node: BGMNode, ctx: AudioContext): void {
+  try {
+    const now = ctx.currentTime;
+    node.gain.gain.cancelScheduledValues(now);
+    node.gain.gain.setValueAtTime(node.gain.gain.value, now);
+    node.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    node.osc.stop(now + 0.5);
+    if (node.lfo) node.lfo.stop(now + 0.5);
+  } catch (e) {
+    // ignore
+  }
+}
+
 export function stopBGM(): void {
   stopCorruptionAudioUpdate();
-  bgmNodes.forEach(({ osc, gain, lfo }) => {
-    try {
-      gain.gain.cancelScheduledValues(audioContext?.currentTime || 0);
-      gain.gain.setValueAtTime(gain.gain.value, audioContext!.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioContext!.currentTime + 0.5);
-      osc.stop(audioContext!.currentTime + 0.5);
-      if (lfo) lfo.stop(audioContext!.currentTime + 0.5);
-    } catch (e) {}
-  });
+  const ctx = audioContext;
+  if (ctx) {
+    bgmNodes.forEach(node => stopSingleNode(node, ctx));
+  }
   bgmNodes = [];
   
-  if (bgmNoiseNode) {
+  if (bgmNoiseNode && ctx) {
     try {
-      bgmNoiseNode.stop(audioContext!.currentTime + 0.5);
-    } catch (e) {}
+      bgmNoiseNode.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      // ignore
+    }
     bgmNoiseNode = null;
   }
-  if (bgmNoiseGain) {
+  if (bgmNoiseGain && ctx) {
     try {
-      bgmNoiseGain.gain.cancelScheduledValues(audioContext?.currentTime || 0);
-      bgmNoiseGain.gain.setValueAtTime(bgmNoiseGain.gain.value, audioContext!.currentTime);
-      bgmNoiseGain.gain.exponentialRampToValueAtTime(0.001, audioContext!.currentTime + 0.5);
-    } catch (e) {}
+      const now = ctx.currentTime;
+      bgmNoiseGain.gain.cancelScheduledValues(now);
+      bgmNoiseGain.gain.setValueAtTime(bgmNoiseGain.gain.value, now);
+      bgmNoiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    } catch (e) {
+      // ignore
+    }
     bgmNoiseGain = null;
   }
-  if (bgmFilter) {
-    bgmFilter = null;
-  }
+  bgmFilter = null;
   currentBGMType = null;
 }
 
@@ -332,9 +354,10 @@ function playTone(
   startTime: number
 ): void {
   if (!audioContext || !sfxGain) return;
+  const ctx = audioContext;
   
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
   
   osc.type = type;
   osc.frequency.value = freq;
@@ -357,16 +380,17 @@ function playNoise(
   startTime: number
 ): void {
   if (!audioContext || !sfxGain || !noiseBuffer) return;
+  const ctx = audioContext;
   
-  const source = audioContext.createBufferSource();
+  const source = ctx.createBufferSource();
   source.buffer = noiseBuffer;
   source.loop = true;
   
-  const filter = audioContext.createBiquadFilter();
+  const filter = ctx.createBiquadFilter();
   filter.type = filterType;
   filter.frequency.value = filterFreq;
   
-  const gain = audioContext.createGain();
+  const gain = ctx.createGain();
   gain.gain.setValueAtTime(0, startTime);
   gain.gain.linearRampToValueAtTime(volume, startTime + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
@@ -380,7 +404,7 @@ function playNoise(
 }
 
 export function playTypingSound(mood: MoodType = 'normal'): void {
-  const freqMap: Record<string, number> = {
+  const freqMap: Record<MoodType, number> = {
     normal: 700,
     tense: 900,
     scared: 600,
@@ -388,7 +412,7 @@ export function playTypingSound(mood: MoodType = 'normal'): void {
     whisper: 400,
     urgent: 1000
   };
-  const volMap: Record<string, number> = {
+  const volMap: Record<MoodType, number> = {
     normal: 0.05,
     tense: 0.07,
     scared: 0.03,
@@ -401,20 +425,20 @@ export function playTypingSound(mood: MoodType = 'normal'): void {
     0.015,
     'square',
     volMap[mood] || 0.05,
-    audioContext?.currentTime || 0
+    getSafeAudioTime()
   );
 }
 
 export function setBGMVolume(vol: number): void {
   bgmVolume = Math.max(0, Math.min(1, vol));
-  if (bgmGain && !muted) {
+  if (bgmGain && !muted && audioContext) {
     bgmGain.gain.value = bgmVolume;
   }
 }
 
 export function setSFXVolume(vol: number): void {
   sfxVolume = Math.max(0, Math.min(1, vol));
-  if (sfxGain && !muted) {
+  if (sfxGain && !muted && audioContext) {
     sfxGain.gain.value = sfxVolume;
   }
 }
