@@ -43,6 +43,16 @@
   } from '../lib/engine';
   import { playBGM, playSFX, initAudio, resumeAudio, stopBGM } from '../lib/audio';
   import { currentPlaythrough, unlockEvidenceId } from '../lib/memory';
+  import {
+    initSignalCorruption,
+    destroySignalCorruption,
+    resetCorruption,
+    setCorruptionTarget,
+    increaseCorruption,
+    decreaseCorruption,
+    signalCorruption,
+    corruptionSeverity
+  } from '../lib/signalCorruption';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType } from '../types/game';
 
   export let onBackToMenu: () => void;
@@ -87,6 +97,7 @@
     if (currentNode.id !== lastNodeId) {
       collectEvidenceByNode(currentNode.id);
       syncEvidenceToMemory(currentNode.id);
+      applyNodeCorruption(currentNode);
       lastNodeId = currentNode.id;
       if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
@@ -96,6 +107,8 @@
     syncCluesFromVariables();
 
     const state = get(gameState);
+    applyVariableCorruption(state.variables);
+
     if (state.dialogueIndex < currentNode.dialogues.length) {
       currentDialogue = currentNode.dialogues[state.dialogueIndex];
     } else {
@@ -125,6 +138,52 @@
         playBGM('calm');
       } else {
         playBGM('deep');
+      }
+    }
+  }
+
+  function applyNodeCorruption(node: StoryNode) {
+    const bgCorruptionMap: Record<string, number> = {
+      tense: 40,
+      damage: 55,
+      dark: 30,
+      creature: 35,
+      glitch: 65,
+      escape: 20,
+      ascent: 10
+    };
+    
+    let target = 0;
+    if (node.background && bgCorruptionMap[node.background] !== undefined) {
+      target = bgCorruptionMap[node.background];
+    }
+    
+    if (node.isEnding) {
+      if (node.endingId === 'ending_madness' || node.endingId === 'ending_silence') {
+        target = Math.max(target, 75);
+      } else if (node.endingId === 'ending_loop') {
+        target = Math.max(target, 60);
+      } else {
+        target = Math.min(target, 15);
+      }
+    }
+    
+    setCorruptionTarget(target);
+  }
+
+  function applyVariableCorruption(variables: Record<string, string | number | boolean>) {
+    let bonus = 0;
+    if (variables.signal_unstable === true) bonus += 25;
+    if (variables.creature_nearby === true) bonus += 20;
+    if (variables.damage_hull === true) bonus += 30;
+    if (variables.protocol_breach === true) bonus += 35;
+    if (variables.full_truth === true) bonus += 40;
+    if (variables.sanity_low === true) bonus += 30;
+    
+    if (bonus > 0) {
+      const current = get(signalCorruption).targetLevel;
+      if (current < bonus) {
+        setCorruptionTarget(bonus);
       }
     }
   }
@@ -216,6 +275,7 @@
     clearDanmakuTimeouts();
     loadState(slot.state);
     resetEvidenceBoard();
+    resetCorruption();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
@@ -228,6 +288,7 @@
     clearDanmakuTimeouts();
     resetGameState();
     resetEvidenceBoard();
+    resetCorruption();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
@@ -244,11 +305,20 @@
   onMount(() => {
     initAudio();
     resumeAudio();
+    initSignalCorruption();
     resetEvidenceBoard();
+    resetCorruption();
     updateState();
     playBGM('deep');
     triggerDanmakusForDialogue(get(gameState).dialogueIndex);
     window.addEventListener('keydown', handleKeydown);
+  });
+
+  onDestroy(() => {
+    destroySignalCorruption();
+    clearDanmakuTimeouts();
+    stopBGM();
+    window.removeEventListener('keydown', handleKeydown);
   });
 
   $: if ($gameState) {
@@ -266,6 +336,32 @@
       <span class="title-text">{currentNode.title}</span>
       {#if $currentPlaythrough > 1}
         <span class="playthrough-badge">第 {$currentPlaythrough} 周目</span>
+      {/if}
+      {#if $signalCorruption.level >= 15}
+        <span 
+          class="signal-status"
+          class:signal-mild={$corruptionSeverity === 'mild'}
+          class:signal-moderate={$corruptionSeverity === 'moderate'}
+          class:signal-severe={$corruptionSeverity === 'severe'}
+          class:signal-critical={$corruptionSeverity === 'critical'}
+        >
+          <span class="signal-icon">📡</span>
+          <span class="signal-text">
+            {#if $corruptionSeverity === 'mild'}信号微弱
+            {:else if $corruptionSeverity === 'moderate'}信号干扰
+            {:else if $corruptionSeverity === 'severe'}信号严重丢失
+            {:else if $corruptionSeverity === 'critical'}信号崩溃
+            {/if}
+          </span>
+          <span class="signal-bar">
+            {#each Array.from({ length: 5 }) as _, i}
+              <span 
+                class="signal-bar-seg"
+                class:active={i < 5 - Math.ceil($signalCorruption.level / 20)}
+              ></span>
+            {/each}
+          </span>
+        </span>
       {/if}
     </div>
   {/if}
@@ -359,6 +455,83 @@
     font-size: 0.7rem;
     color: #ffd890;
     font-family: 'Courier New', monospace;
+  }
+
+  .signal-status {
+    margin-left: 12px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-family: 'Courier New', monospace;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(6px);
+  }
+
+  .signal-status.signal-mild {
+    background: rgba(100, 200, 255, 0.12);
+    border: 1px solid rgba(100, 200, 255, 0.35);
+    color: #64c8ff;
+  }
+
+  .signal-status.signal-moderate {
+    background: rgba(255, 200, 100, 0.15);
+    border: 1px solid rgba(255, 200, 100, 0.4);
+    color: #ffc864;
+  }
+
+  .signal-status.signal-severe {
+    background: rgba(255, 100, 100, 0.18);
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    color: #ff8080;
+    animation: signalPulse 1s infinite;
+  }
+
+  .signal-status.signal-critical {
+    background: rgba(255, 50, 80, 0.22);
+    border: 1px solid rgba(255, 50, 80, 0.6);
+    color: #ff5070;
+    animation: signalPulse 0.4s infinite;
+  }
+
+  .signal-icon {
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  .signal-text {
+    letter-spacing: 0.05em;
+  }
+
+  .signal-bar {
+    display: inline-flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 10px;
+  }
+
+  .signal-bar-seg {
+    width: 3px;
+    height: 100%;
+    background: rgba(100, 100, 100, 0.4);
+    border-radius: 1px;
+  }
+
+  .signal-bar-seg.active {
+    background: currentColor;
+    box-shadow: 0 0 4px currentColor;
+  }
+
+  .signal-bar-seg:nth-child(1) { height: 20%; }
+  .signal-bar-seg:nth-child(2) { height: 40%; }
+  .signal-bar-seg:nth-child(3) { height: 60%; }
+  .signal-bar-seg:nth-child(4) { height: 80%; }
+  .signal-bar-seg:nth-child(5) { height: 100%; }
+
+  @keyframes signalPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
 
   .menu-toggle {

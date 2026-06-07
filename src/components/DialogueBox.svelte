@@ -5,6 +5,8 @@
   import { playSFX, playTypingSound, playBGM } from '../lib/audio';
   import type { DialogueLine, AudioTrigger, MoodType } from '../types/game';
   import { getEffectiveDialogue } from '../lib/engine';
+  import { signalCorruption, glitchSubtitleText } from '../lib/signalCorruption';
+  import { get } from 'svelte/store';
 
   export let dialogue: DialogueLine | null;
   export let onComplete: () => void;
@@ -22,8 +24,12 @@
   let autoAdvanceTimeout: number | null = null;
   let firedSfx = new Set<number>();
   let isMemoryVariant = false;
+  let lineGlitchSeed = 0;
+  let glitchRefreshTimer: number | null = null;
+  let displayedChars: string[] = [];
 
   $: textSpeed = $settings.textSpeed;
+  $: corruptionLevel = $signalCorruption.level;
 
   function getCharDelay(mood?: MoodType, baseSpeed?: number): number {
     const base = baseSpeed !== undefined
@@ -63,7 +69,24 @@
       clearTimeout(autoAdvanceTimeout);
       autoAdvanceTimeout = null;
     }
+    if (glitchRefreshTimer !== null) {
+      clearInterval(glitchRefreshTimer);
+      glitchRefreshTimer = null;
+    }
     firedSfx.clear();
+  }
+
+  function startGlitchRefresh(fullText: string) {
+    if (glitchRefreshTimer !== null) {
+      clearInterval(glitchRefreshTimer);
+    }
+    glitchRefreshTimer = window.setInterval(() => {
+      const corruption = get(signalCorruption).level;
+      if (corruption > 20) {
+        const newSeed = Math.floor(Math.random() * 100000);
+        displayedText = glitchSubtitleText(displayedChars.join(''), corruption, newSeed);
+      }
+    }, 200);
   }
 
   function startTyping() {
@@ -74,8 +97,10 @@
     isMemoryVariant = effective.isMemoryVariant;
     
     displayedText = '';
+    displayedChars = [];
     isComplete = false;
     isTyping.set(true);
+    lineGlitchSeed = Math.floor(Math.random() * 100000);
     
     const fullText = effective.text;
     const mood = dialogue.mood;
@@ -89,6 +114,7 @@
     }
     
     dispatch('lineStart', { text: fullText });
+    startGlitchRefresh(fullText);
     
     sfxTriggers.forEach((trigger: AudioTrigger, triggerIdx: number) => {
       const sfxDelay = trigger.delay !== undefined
@@ -108,7 +134,9 @@
     for (let i = 0; i < fullText.length; i++) {
       const char = fullText[i];
       const timeout = window.setTimeout(() => {
-        displayedText += char;
+        displayedChars.push(char);
+        const corruption = get(signalCorruption).level;
+        displayedText = glitchSubtitleText(displayedChars.join(''), corruption, lineGlitchSeed + i);
         
         if ((i + 1) % soundInterval === 0) {
           playTypingSound(mood);
@@ -151,7 +179,9 @@
     clearAllTimeouts();
     if (dialogue) {
       const effective = getEffectiveDialogue(dialogue);
-      displayedText = effective.text;
+      displayedChars = effective.text.split('');
+      const corruption = get(signalCorruption).level;
+      displayedText = glitchSubtitleText(effective.text, corruption);
     }
     isComplete = true;
     isTyping.set(false);
@@ -189,7 +219,22 @@
   });
 </script>
 
-<div class="dialogue-box" on:click={handleClick} role="button" tabindex="0" on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}>
+<div 
+  class="dialogue-box" 
+  on:click={handleClick} 
+  role="button" 
+  tabindex="0" 
+  on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
+  class:corrupted-mild={corruptionLevel >= 20 && corruptionLevel < 45}
+  class:corrupted-moderate={corruptionLevel >= 45 && corruptionLevel < 70}
+  class:corrupted-severe={corruptionLevel >= 70}
+>
+  {#if corruptionLevel >= 30}
+    <div class="corruption-overlay"></div>
+  {/if}
+  {#if corruptionLevel >= 60}
+    <div class="scanlines"></div>
+  {/if}
   {#if dialogue}
     {#if dialogue.speaker}
       <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'} class:memory={isMemoryVariant}>
@@ -206,6 +251,7 @@
       class:whisper-text={dialogue.mood === 'whisper'}
       class:urgent-text={dialogue.mood === 'urgent'}
       class:memory-text={isMemoryVariant}
+      class:glitch-text={corruptionLevel >= 40}
     >
       {displayedText}
       {#if !isComplete}
@@ -217,6 +263,18 @@
         <span class="hint-arrow">▼</span>
       </div>
     {/if}
+  {/if}
+  {#if corruptionLevel >= 15}
+    <div class="signal-indicator">
+      <span class="signal-label">信号</span>
+      <div class="signal-bars">
+        <span class:bar-active={corruptionLevel < 30}>▮</span>
+        <span class:bar-active={corruptionLevel < 50}>▮</span>
+        <span class:bar-active={corruptionLevel < 70}>▮</span>
+        <span class:bar-active={corruptionLevel < 85}>▮</span>
+        <span class:bar-active={corruptionLevel < 95}>▮</span>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -340,6 +398,121 @@
 
   .hint-arrow {
     font-size: 0.8rem;
+  }
+
+  .corrupted-mild {
+    filter: contrast(1.05) saturate(0.9);
+  }
+
+  .corrupted-moderate {
+    filter: contrast(1.15) saturate(0.75) hue-rotate(-5deg);
+    animation: corruptWobble 0.5s infinite;
+  }
+
+  .corrupted-severe {
+    filter: contrast(1.3) saturate(0.5) hue-rotate(-15deg) brightness(0.9);
+    animation: corruptWobble 0.2s infinite;
+  }
+
+  .corruption-overlay {
+    position: absolute;
+    inset: 0;
+    background: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 200, 0.02) 2px,
+        rgba(0, 255, 200, 0.02) 4px
+      );
+    pointer-events: none;
+    border-radius: inherit;
+    animation: overlayShift 0.15s infinite;
+    z-index: 5;
+  }
+
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 1px,
+      rgba(0, 0, 0, 0.15) 1px,
+      rgba(0, 0, 0, 0.15) 3px
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 6;
+    animation: scanlineMove 8s linear infinite;
+  }
+
+  .glitch-text {
+    animation: textGlitch 0.4s infinite;
+    text-shadow: 
+      1px 0 rgba(255, 0, 100, 0.4),
+      -1px 0 rgba(0, 255, 255, 0.4);
+  }
+
+  .signal-indicator {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    color: rgba(255, 100, 100, 0.8);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 100, 100, 0.3);
+    z-index: 10;
+  }
+
+  .signal-label {
+    opacity: 0.9;
+  }
+
+  .signal-bars {
+    display: flex;
+    gap: 1px;
+    font-size: 0.5rem;
+  }
+
+  .signal-bars span {
+    color: rgba(100, 100, 100, 0.5);
+  }
+
+  .signal-bars span.bar-active {
+    color: #64ff96;
+    text-shadow: 0 0 4px rgba(100, 255, 150, 0.6);
+  }
+
+  @keyframes corruptWobble {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-0.5px, 0.5px); }
+    50% { transform: translate(0.5px, -0.5px); }
+    75% { transform: translate(-0.3px, -0.3px); }
+  }
+
+  @keyframes overlayShift {
+    0%, 100% { opacity: 0.8; transform: translateX(0); }
+    50% { opacity: 1; transform: translateX(1px); }
+  }
+
+  @keyframes scanlineMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  @keyframes textGlitch {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-1px, 1px); }
+    40% { transform: translate(1px, -1px); }
+    60% { transform: translate(-1px, -1px); }
+    80% { transform: translate(1px, 1px); }
   }
 
   @media (max-width: 480px) {

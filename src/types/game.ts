@@ -245,4 +245,17 @@ export interface GlobalMemory {
   updatedAt: number;
 }
 
+export interface SignalCorruptionState {
+  level: number;
+  targetLevel: number;
+  lastUpdate: number;
+  fluctuation: number;
+}
+
+export interface CorruptionEffect {
+  type: 'subtitle_glitch' | 'danmaku_delay' | 'audio_distort' | 'choice_hide' | 'visual_artifact';
+  intensity: number;
+  seed?: number;
+}
+
 

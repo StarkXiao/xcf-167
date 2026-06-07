@@ -1,7 +1,13 @@
 <script lang="ts">
+  import { signalCorruption, getVisualArtifactChance } from '../lib/signalCorruption';
+
   export let background: string = 'default';
 
   $: bgStyle = getBackgroundStyle(background);
+  $: corruptionLevel = $signalCorruption.level;
+  $: showCorruption = corruptionLevel >= 20;
+  $: showHeavyCorruption = corruptionLevel >= 55;
+  $: showCriticalCorruption = corruptionLevel >= 80;
 
   function getBackgroundStyle(bg: string): string {
     const styles: Record<string, string> = {
@@ -22,7 +28,13 @@
   }
 </script>
 
-<div class="background-layer" style="background: {bgStyle};">
+<div 
+  class="background-layer" 
+  style="background: {bgStyle};"
+  class:bg-corrupted={showCorruption}
+  class:bg-heavily-corrupted={showHeavyCorruption}
+  class:bg-critically-corrupted={showCriticalCorruption}
+>
   <div class="noise-overlay"></div>
   <div class="vignette"></div>
   {#if background === 'dark' || background === 'creature' || background === 'glitch'}
@@ -40,6 +52,23 @@
   {/if}
   {#if background === 'glitch'}
     <div class="glitch-effect"></div>
+  {/if}
+  {#if showCorruption}
+    <div class="corruption-scanlines" class:heavy={showHeavyCorruption}></div>
+  {/if}
+  {#if showHeavyCorruption}
+    <div class="corruption-chromatic"></div>
+  {/if}
+  {#if showCriticalCorruption}
+    <div class="corruption-blocks">
+      {#each Array.from({ length: 8 }) as _, i}
+        <div 
+          class="corruption-block"
+          style="top: {Math.random() * 100}%; left: {Math.random() * 100}%; width: {20 + Math.random() * 150}px; height: {2 + Math.random() * 8}px; animation-delay: {Math.random() * 2}s;"
+        ></div>
+      {/each}
+    </div>
+    <div class="corruption-tear" class:visible={Math.random() < 0.3}></div>
   {/if}
 </div>
 
@@ -102,5 +131,122 @@
     );
     animation: glitch 0.3s infinite;
     pointer-events: none;
+  }
+
+  .background-layer.bg-corrupted {
+    filter: contrast(1.08) saturate(0.9);
+  }
+
+  .background-layer.bg-heavily-corrupted {
+    filter: contrast(1.2) saturate(0.7) hue-rotate(-10deg) brightness(0.95);
+    animation: bgWobble 0.6s infinite;
+  }
+
+  .background-layer.bg-critically-corrupted {
+    filter: contrast(1.35) saturate(0.5) hue-rotate(-20deg) brightness(0.85);
+    animation: bgWobble 0.25s infinite;
+  }
+
+  .corruption-scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.12) 2px,
+      rgba(0, 0, 0, 0.12) 4px
+    );
+    pointer-events: none;
+    z-index: 5;
+    animation: corruptionScroll 6s linear infinite;
+  }
+
+  .corruption-scanlines.heavy {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 1px,
+      rgba(0, 0, 0, 0.2) 1px,
+      rgba(0, 0, 0, 0.2) 3px
+    );
+  }
+
+  .corruption-chromatic {
+    position: absolute;
+    inset: 0;
+    background: 
+      linear-gradient(90deg, rgba(255, 0, 80, 0.04) 0%, transparent 30%, transparent 70%, rgba(0, 255, 200, 0.04) 100%);
+    pointer-events: none;
+    z-index: 6;
+    animation: chromaticShift 0.8s infinite;
+    mix-blend-mode: screen;
+  }
+
+  .corruption-blocks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 7;
+    overflow: hidden;
+  }
+
+  .corruption-block {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.7);
+    animation: blockFlicker 0.15s infinite;
+  }
+
+  .corruption-tear {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, 
+      transparent 0%, 
+      rgba(255, 0, 100, 0.6) 20%, 
+      rgba(0, 255, 200, 0.6) 50%, 
+      rgba(255, 255, 0, 0.6) 80%, 
+      transparent 100%
+    );
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0;
+    left: 30%;
+    animation: tearSweep 2s ease-in-out infinite;
+  }
+
+  .corruption-tear.visible {
+    opacity: 1;
+  }
+
+  @keyframes bgWobble {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(-0.5px, 0.5px) scale(1.002); }
+    50% { transform: translate(0.5px, -0.5px) scale(0.998); }
+    75% { transform: translate(-0.3px, -0.3px) scale(1.001); }
+  }
+
+  @keyframes corruptionScroll {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  @keyframes chromaticShift {
+    0%, 100% { transform: translateX(0); opacity: 0.8; }
+    33% { transform: translateX(2px); opacity: 1; }
+    66% { transform: translateX(-2px); opacity: 0.6; }
+  }
+
+  @keyframes blockFlicker {
+    0%, 100% { opacity: 0.9; transform: translateX(0); }
+    50% { opacity: 0.4; transform: translateX(5px); }
+  }
+
+  @keyframes tearSweep {
+    0% { left: -5%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { left: 105%; opacity: 0; }
   }
 </style>

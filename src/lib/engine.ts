@@ -35,6 +35,7 @@ import {
   isClueUnlocked
 } from './memory';
 import { playSFX } from './audio';
+import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -384,14 +385,19 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
   
   const fullText = dialogue.text;
   const totalTypingDuration = calculateTotalTypingDuration(fullText, charDelay);
+  const corruptionLevel = getCurrentCorruption();
   
-  const relevantDanmakus = node.danmakus.filter(d => {
+  let relevantDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== undefined) {
       return d.dialogueIndex === dialogueIndex;
     }
     const baseTime = dialogueIndex * 10000;
     return d.timestamp >= baseTime && d.timestamp < baseTime + 10000;
   });
+  
+  if (corruptionLevel > 25 && Math.random() < getDanmakuReorderChance(corruptionLevel)) {
+    relevantDanmakus = [...relevantDanmakus].sort(() => Math.random() - 0.5);
+  }
   
   relevantDanmakus.forEach(danmaku => {
     let delay: number;
@@ -406,12 +412,22 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
       delay = Math.max(0, danmaku.timestamp - baseTime);
     }
     
+    delay = calculateDanmakuDelay(delay, corruptionLevel);
+    
     const timeout = window.setTimeout(() => {
-      addDanmaku(danmaku);
+      const corruptedDanmaku = { ...danmaku };
+      if (corruptionLevel > 35) {
+        corruptedDanmaku.content = glitchSubtitleText(danmaku.content, corruptionLevel * 0.6);
+      }
+      if (corruptionLevel > 60 && Math.random() < 0.3) {
+        corruptedDanmaku.color = ['#ff0066', '#00ffcc', '#ffff00', '#ff6600', '#6600ff'][Math.floor(Math.random() * 5)];
+      }
+      addDanmaku(corruptedDanmaku);
       
+      const displayDuration = corruptionLevel > 70 ? 5000 + Math.random() * 3000 : 8000;
       window.setTimeout(() => {
         removeDanmaku(danmaku.id);
-      }, 8000);
+      }, displayDuration);
     }, delay);
     danmakuTimeouts.push(timeout);
   });
@@ -426,6 +442,7 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
   
   const elapsedMs = calculateCharTime(dialogue.text, charIndex, charDelay);
   const tolerance = charDelay * 3;
+  const corruptionLevel = getCurrentCorruption();
   
   const dueDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== dialogueIndex) return false;
@@ -434,10 +451,18 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
   });
   
   dueDanmakus.forEach(danmaku => {
-    addDanmaku(danmaku);
+    const corruptedDanmaku = { ...danmaku };
+    if (corruptionLevel > 35) {
+      corruptedDanmaku.content = glitchSubtitleText(danmaku.content, corruptionLevel * 0.6);
+    }
+    if (corruptionLevel > 60 && Math.random() < 0.3) {
+      corruptedDanmaku.color = ['#ff0066', '#00ffcc', '#ffff00', '#ff6600', '#6600ff'][Math.floor(Math.random() * 5)];
+    }
+    addDanmaku(corruptedDanmaku);
+    const displayDuration = corruptionLevel > 70 ? 5000 + Math.random() * 3000 : 8000;
     window.setTimeout(() => {
       removeDanmaku(danmaku.id);
-    }, 8000);
+    }, displayDuration);
   });
 }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { settings } from '../lib/store';
+  import { signalCorruption, getVisualArtifactChance } from '../lib/signalCorruption';
   import type { Danmaku } from '../types/game';
 
   export let danmakus: Danmaku[];
@@ -11,6 +12,8 @@
 
   $: danmakuEnabled = $settings.danmakuEnabled;
   $: danmakuSpeed = $settings.danmakuSpeed;
+  $: corruptionLevel = $signalCorruption.level;
+  $: artifactChance = getVisualArtifactChance(corruptionLevel);
 
   function getTrack(danmakuId: string, width: number): number {
     const now = Date.now();
@@ -32,19 +35,41 @@
     return Math.floor(Math.random() * TRACK_COUNT);
   }
 
+  function getDanmakuStyle(d: Danmaku, track: number): string {
+    const baseDuration = 8 / danmakuSpeed;
+    const duration = corruptionLevel > 40 ? baseDuration * (0.7 + Math.random() * 0.6) : baseDuration;
+    const color = d.color || '#ffffff';
+    let style = `top: calc(${track} * (100% / ${TRACK_COUNT}) + 5%); animation-duration: ${duration}s; color: ${color};`;
+    if (corruptionLevel > 50 && Math.random() < (corruptionLevel - 50) / 100) {
+      const offsetX = (Math.random() - 0.5) * 20;
+      const offsetY = (Math.random() - 0.5) * 10;
+      style += ` transform: translate(${offsetX}px, ${offsetY}px);`;
+    }
+    return style;
+  }
+
   onDestroy(() => {
     occupiedTracks.clear();
   });
 </script>
 
 {#if danmakuEnabled}
-  <div class="danmaku-layer" bind:this={container}>
+  <div 
+    class="danmaku-layer" 
+    bind:this={container}
+    class:corrupted={corruptionLevel >= 30}
+    class:heavily-corrupted={corruptionLevel >= 65}
+  >
+    {#if corruptionLevel >= 40}
+      <div class="danmaku-noise-overlay"></div>
+    {/if}
     {#each danmakus as d}
       {@const track = getTrack(d.id, 200)}
       <div 
         class="danmaku-item"
-        style="top: calc({track} * (100% / {TRACK_COUNT}) + 5%); animation-duration: {8 / danmakuSpeed}s; color: {d.color || '#ffffff'};"
+        style={getDanmakuStyle(d, track)}
         class:important={d.isImportant}
+        class:glitched={corruptionLevel >= 45 && Math.random() < (corruptionLevel - 40) / 100}
       >
         <span class="dm-username">{d.username}:</span>
         <span class="dm-content">{d.content}</span>
@@ -92,6 +117,49 @@
 
   .dm-content {
     color: inherit;
+  }
+
+  .danmaku-layer.corrupted {
+    filter: contrast(1.1) saturate(0.85);
+  }
+
+  .danmaku-layer.heavily-corrupted {
+    filter: contrast(1.25) saturate(0.6) hue-rotate(10deg);
+    animation: danmakuLayerShake 0.3s infinite;
+  }
+
+  .danmaku-noise-overlay {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.6;
+    animation: noiseShift 0.2s infinite;
+  }
+
+  .danmaku-item.glitched {
+    animation: danmakuGlitch 0.15s infinite;
+    text-shadow: 
+      2px 0 rgba(255, 0, 100, 0.6),
+      -2px 0 rgba(0, 255, 255, 0.6);
+  }
+
+  @keyframes danmakuLayerShake {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(-1px, 0.5px); }
+    66% { transform: translate(1px, -0.5px); }
+  }
+
+  @keyframes noiseShift {
+    0%, 100% { transform: translate(0, 0); opacity: 0.5; }
+    50% { transform: translate(1px, 1px); opacity: 0.7; }
+  }
+
+  @keyframes danmakuGlitch {
+    0%, 100% { transform: translate(0); opacity: 1; }
+    25% { transform: translate(-2px, 1px); opacity: 0.85; }
+    50% { transform: translate(2px, -1px); opacity: 0.9; }
+    75% { transform: translate(-1px, 2px); opacity: 0.8; }
   }
 
   @media (max-width: 480px) {

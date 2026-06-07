@@ -1,10 +1,16 @@
 import type { SFXType, BGMType, MoodType } from '../types/game';
+import { signalCorruption, getAudioDistortionParams } from './signalCorruption';
+import { get } from 'svelte/store';
 
 let audioContext: AudioContext | null = null;
 let bgmGain: GainNode | null = null;
 let sfxGain: GainNode | null = null;
-let bgmNodes: { osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode }[] = [];
+let bgmNodes: { osc: OscillatorNode; gain: GainNode; lfo?: OscillatorNode; lfoGain?: GainNode }[] = [];
 let noiseBuffer: AudioBuffer | null = null;
+let bgmNoiseNode: AudioBufferSourceNode | null = null;
+let bgmNoiseGain: GainNode | null = null;
+let bgmFilter: BiquadFilterNode | null = null;
+let corruptionUpdateTimer: number | null = null;
 
 let bgmVolume = 0.3;
 let sfxVolume = 0.5;
@@ -47,6 +53,39 @@ export function resumeAudio(): void {
   }
 }
 
+function startCorruptionAudioUpdate() {
+  if (corruptionUpdateTimer !== null) return;
+  corruptionUpdateTimer = window.setInterval(() => {
+    if (!audioContext || !bgmGain) return;
+    const corruptionLevel = get(signalCorruption).level;
+    const params = getAudioDistortionParams(corruptionLevel);
+    
+    if (bgmFilter) {
+      bgmFilter.frequency.setValueAtTime(params.filterCutoff, audioContext.currentTime);
+    }
+    
+    if (bgmNoiseGain) {
+      bgmNoiseGain.gain.setValueAtTime(muted ? 0 : params.noiseAmount, audioContext.currentTime);
+    }
+    
+    bgmNodes.forEach(({ osc, lfo, lfoGain }, i) => {
+      if (lfo && lfoGain) {
+        const baseLfoRate = currentBGMType === 'tense' ? 0.25 : currentBGMType === 'mystery' ? 0.12 : currentBGMType === 'calm' ? 0.06 : 0.08;
+        lfo.frequency.setValueAtTime(baseLfoRate + i * 0.03 + params.pitchShift * 0.001, audioContext.currentTime);
+        lfoGain.gain.setValueAtTime(0.024 + params.lfoDepth * 0.05, audioContext.currentTime);
+      }
+      osc.detune.setValueAtTime(params.pitchShift + Math.sin(Date.now() / 500 + i) * corruptionLevel * 0.05, audioContext.currentTime);
+    });
+  }, 100);
+}
+
+function stopCorruptionAudioUpdate() {
+  if (corruptionUpdateTimer !== null) {
+    clearInterval(corruptionUpdateTimer);
+    corruptionUpdateTimer = null;
+  }
+}
+
 export function playBGM(type: BGMType = 'deep'): void {
   if (currentBGMType === type) return;
   currentBGMType = type;
@@ -62,6 +101,29 @@ export function playBGM(type: BGMType = 'deep'): void {
   };
   
   const preset = presets[type] || presets.deep;
+  
+  bgmFilter = audioContext.createBiquadFilter();
+  bgmFilter.type = 'lowpass';
+  bgmFilter.frequency.value = 8000;
+  bgmFilter.Q.value = 0.5;
+  bgmFilter.connect(bgmGain);
+  
+  bgmNoiseGain = audioContext.createGain();
+  bgmNoiseGain.gain.value = 0;
+  bgmNoiseGain.connect(bgmGain);
+  
+  if (noiseBuffer) {
+    bgmNoiseNode = audioContext.createBufferSource();
+    bgmNoiseNode.buffer = noiseBuffer;
+    bgmNoiseNode.loop = true;
+    const noiseFilter = audioContext.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 1500;
+    noiseFilter.Q.value = 0.3;
+    bgmNoiseNode.connect(noiseFilter);
+    noiseFilter.connect(bgmNoiseGain);
+    bgmNoiseNode.start();
+  }
   
   preset.freqs.forEach((freq, i) => {
     const osc = audioContext!.createOscillator();
@@ -80,14 +142,17 @@ export function playBGM(type: BGMType = 'deep'): void {
     lfo.start();
     
     osc.connect(gain);
-    gain.connect(bgmGain!);
+    gain.connect(bgmFilter!);
     osc.start();
     
-    bgmNodes.push({ osc, gain, lfo });
+    bgmNodes.push({ osc, gain, lfo, lfoGain });
   });
+  
+  startCorruptionAudioUpdate();
 }
 
 export function stopBGM(): void {
+  stopCorruptionAudioUpdate();
   bgmNodes.forEach(({ osc, gain, lfo }) => {
     try {
       gain.gain.cancelScheduledValues(audioContext?.currentTime || 0);
@@ -98,6 +163,24 @@ export function stopBGM(): void {
     } catch (e) {}
   });
   bgmNodes = [];
+  
+  if (bgmNoiseNode) {
+    try {
+      bgmNoiseNode.stop(audioContext!.currentTime + 0.5);
+    } catch (e) {}
+    bgmNoiseNode = null;
+  }
+  if (bgmNoiseGain) {
+    try {
+      bgmNoiseGain.gain.cancelScheduledValues(audioContext?.currentTime || 0);
+      bgmNoiseGain.gain.setValueAtTime(bgmNoiseGain.gain.value, audioContext!.currentTime);
+      bgmNoiseGain.gain.exponentialRampToValueAtTime(0.001, audioContext!.currentTime + 0.5);
+    } catch (e) {}
+    bgmNoiseGain = null;
+  }
+  if (bgmFilter) {
+    bgmFilter = null;
+  }
   currentBGMType = null;
 }
 
