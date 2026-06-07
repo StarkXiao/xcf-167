@@ -3,7 +3,7 @@
   import { isTyping } from '../lib/store';
   import { settings } from '../lib/store';
   import { playSFX, playTypingSound, playBGM } from '../lib/audio';
-  import type { DialogueLine, AudioTrigger } from '../types/game';
+  import type { DialogueLine, AudioTrigger, MoodType } from '../types/game';
 
   export let dialogue: DialogueLine | null;
   export let onComplete: () => void;
@@ -23,12 +23,12 @@
 
   $: textSpeed = $settings.textSpeed;
 
-  function getCharDelay(mood?: string, baseSpeed?: number): number {
+  function getCharDelay(mood?: MoodType, baseSpeed?: number): number {
     const base = baseSpeed !== undefined
       ? Math.max(15, 100 - baseSpeed)
       : Math.max(15, 100 - textSpeed);
     
-    const moodMultipliers: Record<string, number> = {
+    const moodMultipliers: Record<MoodType, number> = {
       normal: 1.0,
       tense: 0.7,
       scared: 1.4,
@@ -37,11 +37,11 @@
       urgent: 0.5
     };
     
-    return base * (moodMultipliers[mood || 'normal'] || 1.0);
+    return base * (moodMultipliers[mood || 'normal']);
   }
 
-  function getTypingSoundInterval(mood?: string): number {
-    const intervals: Record<string, number> = {
+  function getTypingSoundInterval(mood?: MoodType): number {
+    const intervals: Record<MoodType, number> = {
       normal: 3,
       tense: 2,
       scared: 5,
@@ -49,7 +49,7 @@
       whisper: 8,
       urgent: 1
     };
-    return intervals[mood || 'normal'] || 3;
+    return intervals[mood || 'normal'];
   }
 
   function clearAllTimeouts(): void {

@@ -25,6 +25,10 @@ export interface StateEffect {
   [key: string]: string | number | boolean;
 }
 
+export type BGMType = 'deep' | 'tense' | 'calm' | 'mystery';
+
+export type MoodType = 'normal' | 'tense' | 'scared' | 'calm' | 'whisper' | 'urgent';
+
 export type SFXType =
   | 'click' | 'select' | 'warning' | 'sonar' | 'bubbles'
   | 'water_drip' | 'water_flow' | 'metal_creak' | 'metal_crash'
@@ -45,9 +49,9 @@ export interface DialogueLine {
   audioId?: string;
   delay?: number;
   sfx?: AudioTrigger[];
-  bgm?: 'deep' | 'tense' | 'calm' | 'mystery';
+  bgm?: BGMType;
   baseTypingSpeed?: number;
-  mood?: 'normal' | 'tense' | 'scared' | 'calm' | 'whisper' | 'urgent';
+  mood?: MoodType;
   autoAdvance?: boolean;
   autoAdvanceDelay?: number;
 }
@@ -56,6 +60,7 @@ export interface StoryNode {
   id: string;
   background?: string;
   title?: string;
+  bgm?: BGMType;
   dialogues: DialogueLine[];
   danmakus?: Danmaku[];
   choices?: Choice[];

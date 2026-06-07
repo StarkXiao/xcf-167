@@ -1,4 +1,4 @@
-import type { SFXType } from '../types/game';
+import type { SFXType, BGMType, MoodType } from '../types/game';
 
 let audioContext: AudioContext | null = null;
 let bgmGain: GainNode | null = null;
@@ -47,7 +47,7 @@ export function resumeAudio(): void {
   }
 }
 
-export function playBGM(type: 'deep' | 'tense' | 'calm' | 'mystery' = 'deep'): void {
+export function playBGM(type: BGMType = 'deep'): void {
   if (currentBGMType === type) return;
   currentBGMType = type;
   
@@ -296,7 +296,7 @@ function playNoise(
   source.stop(startTime + duration + 0.05);
 }
 
-export function playTypingSound(mood: string = 'normal'): void {
+export function playTypingSound(mood: MoodType = 'normal'): void {
   const freqMap: Record<string, number> = {
     normal: 700,
     tense: 900,

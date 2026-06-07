@@ -31,7 +31,7 @@
     clearDanmakuTimeouts
   } from '../lib/engine';
   import { playBGM, playSFX, initAudio, resumeAudio, stopBGM } from '../lib/audio';
-  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending } from '../types/game';
+  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType } from '../types/game';
 
   export let onBackToMenu: () => void;
   export let onShowEndingsGallery: () => void;
@@ -109,10 +109,10 @@
     const base = d.baseTypingSpeed !== undefined
       ? Math.max(15, 100 - d.baseTypingSpeed)
       : Math.max(15, 100 - textSpeed);
-    const moodMultipliers: Record<string, number> = {
+    const moodMultipliers: Record<MoodType, number> = {
       normal: 1.0, tense: 0.7, scared: 1.4, calm: 1.3, whisper: 1.6, urgent: 0.5
     };
-    return base * (moodMultipliers[d.mood || 'normal'] || 1.0);
+    return base * moodMultipliers[d.mood || 'normal'];
   }
 
   function calculateCharTime(text: string, targetIndex: number, charDelay: number): number {
