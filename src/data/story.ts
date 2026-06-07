@@ -788,20 +788,111 @@ export const nodes: StoryNode[] = [
         mood: 'calm'
       })
     ],
-    nextNodeId: 'ending_resolve_stop'
+    choices: [
+      { id: 'c_trust_su', text: '相信苏博士的计划', nextNodeId: 'ending_resolve_stop', effect: { full_trust: true } },
+      { id: 'c_doubt', text: '他们在隐瞒更多东西...', nextNodeId: 'ending_resolve_stop', condition: { clue_danmaku_deep: true }, effect: { doubt: true } }
+    ]
   },
   {
     id: 'ending_resolve_stop',
     title: '【命运裁定】',
     background: 'dark',
     dialogues: [
-      mkLine('', '协议07的频率在深海中回响...', {
+      mkLine('', '协议07的频率在深海中回响...而你的选择，将决定故事的终点。', {
         mood: 'calm',
         autoAdvance: true,
-        autoAdvanceDelay: 1500
+        autoAdvanceDelay: 2000
       })
     ],
     nextNodeId: 'ending_survival'
+  },
+  {
+    id: 'ending_survival_stop',
+    title: '【幸存者·协议线】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('老周', '那个东西已经离开了。紧急上浮程序启动。', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '...我们活下来了？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '暂时。但它会记住我们。', {
+        mood: 'calm'
+      }),
+      mkLine('小林', '那...我们还能回去吗？', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '只要永远不再提今天看到的一切。公司会处理好一切。', {
+        mood: 'tense'
+      }),
+      mkLine('', '72小时后。\n你在新闻中看到：深渊号成功完成深海科考任务，全体船员平安归来。\n直播录像被官方重新剪辑后发布，所有奇怪的部分都消失了。\n而你手中的这份原始备份...也许永远不会有人知道它的存在。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_survival',
+    endingTitle: '幸存者',
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。'
+  },
+  {
+    id: 'ending_loop_stop',
+    title: '【无尽回放·协议线】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '你继续看着这份录像，一遍又一遍。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('', '苏博士的话中有太多漏洞。\n老周的操作手册上有奇怪的标记。\n小林发给谁的消息？\n阿海攥着的十字架背面刻着什么？', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1000, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '每看一遍，你都能发现新的疑点。\n但所有疑问都指向同一个方向——\n\n　　　　你收到的这份"匿名邮件"，真的是匿名的吗？', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('', '发送者希望你看到什么？\n又希望你忽略什么？\n\n时间戳永远停在03:17:42。\n而你，还在继续回放。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1500, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_loop',
+    endingTitle: '无尽回放',
+    endingDescription: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。'
+  },
+  {
+    id: 'ending_madness_stop',
+    title: '【深渊回响·协议线】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '当你终于看清协议07频率的含义时，你开始怀疑——', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '那不是驱赶的信号。那是...在回应。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '它一直在听。而它，回答了。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_madness',
+    endingTitle: '深渊回响',
+    endingDescription: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？'
   },
   {
     id: 'ending_survival',
@@ -953,13 +1044,48 @@ export const nodes: StoryNode[] = [
     title: '【命运裁定】',
     background: 'escape',
     dialogues: [
-      mkLine('', '救援船只的信号越来越近...', {
+      mkLine('', '救援船只的信号越来越近...但在这一刻，你仍然无法确定，等待你们的将是什么。', {
         mood: 'calm',
         autoAdvance: true,
-        autoAdvanceDelay: 1500
+        autoAdvanceDelay: 2000
       })
     ],
     nextNodeId: 'ending_survival'
+  },
+  {
+    id: 'ending_survival_ascent',
+    title: '【幸存者·上浮线】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('', '72小时后。\n你在新闻中看到：深渊号成功完成深海科考任务，全体船员平安归来。\n直播录像被官方重新剪辑后发布，所有奇怪的部分都消失了。\n而你手中的这份原始备份...也许永远不会有人知道它的存在。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_survival',
+    endingTitle: '幸存者',
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。'
+  },
+  {
+    id: 'ending_truth_ascent',
+    title: '【深海真相·上浮线】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你拼凑出了所有线索，揭开了海底的秘密。\n即使成功上浮，即使官方试图掩盖——真相不会沉默。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('', '你手中的这份原始录像，将是撬开深渊的第一道裂缝。', {
+        mood: 'tense'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_truth',
+    endingTitle: '深海真相',
+    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。'
   },
   {
     id: 'ending_silence',

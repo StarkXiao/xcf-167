@@ -100,28 +100,37 @@ export function advance(): void {
 }
 
 function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
-  const endingRedirectMap: Record<string, string[]> = {
-    live_continue: ['ending_truth', 'ending_madness'],
-    ascent_ending: ['ending_survival', 'ending_silence', 'ending_truth'],
-    stop_continue: ['ending_survival', 'ending_loop', 'ending_madness'],
-    ending_path_live: ['ending_truth', 'ending_madness'],
-    ending_resolve_live: ['ending_truth', 'ending_madness'],
-    ending_resolve_ascent: ['ending_survival', 'ending_silence', 'ending_truth'],
-    ending_resolve_stop: ['ending_survival', 'ending_loop', 'ending_madness']
+  const endingRedirectMap: Record<string, { candidates: string[]; nodeMap: Record<string, string> }> = {
+    ending_resolve_live: {
+      candidates: ['ending_truth', 'ending_madness'],
+      nodeMap: {
+        ending_truth: 'ending_truth_node',
+        ending_madness: 'ending_madness_node'
+      }
+    },
+    ending_resolve_ascent: {
+      candidates: ['ending_survival', 'ending_silence', 'ending_truth'],
+      nodeMap: {
+        ending_survival: 'ending_survival_ascent',
+        ending_silence: 'ending_silence',
+        ending_truth: 'ending_truth_ascent'
+      }
+    },
+    ending_resolve_stop: {
+      candidates: ['ending_survival', 'ending_loop', 'ending_madness'],
+      nodeMap: {
+        ending_survival: 'ending_survival_stop',
+        ending_loop: 'ending_loop_stop',
+        ending_madness: 'ending_madness_stop'
+      }
+    }
   };
 
-  if (endingRedirectMap[currentNodeId]) {
-    const candidates = endingRedirectMap[currentNodeId];
-    const weightedEnding = selectWeightedEnding(candidates);
+  const config = endingRedirectMap[currentNodeId];
+  if (config) {
+    const weightedEnding = selectWeightedEnding(config.candidates);
     if (weightedEnding) {
-      const endingNodeMap: Record<string, string> = {
-        ending_truth: 'ending_truth_node',
-        ending_survival: 'ending_survival',
-        ending_silence: 'ending_silence',
-        ending_madness: 'ending_madness_node',
-        ending_loop: 'ending_loop'
-      };
-      return endingNodeMap[weightedEnding] || nextNodeId;
+      return config.nodeMap[weightedEnding] || nextNodeId;
     }
   }
 
