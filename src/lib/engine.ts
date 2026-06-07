@@ -23,7 +23,7 @@ import {
   isTyping
 } from './store';
 import { get } from 'svelte/store';
-import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier } from './evidence';
+import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier, evidenceBoard } from './evidence';
 import {
   checkMemoryCondition,
   selectDialogueVariant,
@@ -58,7 +58,11 @@ export function checkAllConditions(
   stateCondition?: StateCondition,
   memoryCondition?: MemoryCondition
 ): boolean {
-  return checkCondition(stateCondition) && checkMemoryCondition(memoryCondition);
+  const memoryOk = checkMemoryCondition(memoryCondition);
+  if (memoryCondition && memoryOk) {
+    return true;
+  }
+  return checkCondition(stateCondition) && memoryOk;
 }
 
 export function applyEffect(effect?: StateEffect): void {
@@ -234,10 +238,8 @@ function recordPlaythroughCompletion(endingId: string): void {
 
 function getEvidenceStateIds(): string[] {
   try {
-    const { evidenceBoard } = require('./evidence');
-    const { get } = require('svelte/store');
     const state = get(evidenceBoard);
-    return state.collectedEvidence.map((e: any) => e.id);
+    return state.collectedEvidence.map(e => e.id);
   } catch {
     return [];
   }
