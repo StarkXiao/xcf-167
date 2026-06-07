@@ -36,6 +36,8 @@ export const nodes: StoryNode[] = [
     id: 'start',
     title: '【深海直播·回放】',
     background: 'intro',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '直播开场',
     dialogues: [
       mkLine('系统', '——正在恢复数据缓存——', {
         sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }],
@@ -146,6 +148,8 @@ export const nodes: StoryNode[] = [
     id: 'intro_2',
     title: '【下潜中 · 深度800米】',
     background: 'descent',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '下潜800米',
     dialogues: [
       mkLine('老周', '深度800米，水压正常，船体一切正常。', {
         sfx: [{ sfx: 'hull_pressure', delay: 0, volume: 0.5 }],
@@ -236,6 +240,8 @@ export const nodes: StoryNode[] = [
     title: '【下潜中 · 深度1500米】',
     background: 'descent',
     bgm: 'mystery',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '首次异常信号',
     dialogues: [
       mkLine('老周', '...奇怪。', {
         sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.5 }],
@@ -325,6 +331,8 @@ export const nodes: StoryNode[] = [
     title: '【第一次接触】',
     background: 'creature',
     bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '第一次接触',
     dialogues: [
       mkLine('苏博士', '把灯光打过去！快！', {
         sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.5 }],
@@ -615,6 +623,8 @@ export const nodes: StoryNode[] = [
     id: 'critical_choice',
     title: '【关键抉择】',
     background: 'dark',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '关键抉择点',
     dialogues: [
       mkLine('小林', '我...我听阿海的。', {
         sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
@@ -882,6 +892,8 @@ export const nodes: StoryNode[] = [
     title: '【直播继续】',
     background: 'tense',
     bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '直播继续线',
     dialogues: [
       mkLine('阿海', '各位，我们选择继续直播。全世界都在看着，我们不能退缩。', {
         sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
@@ -1177,6 +1189,8 @@ export const nodes: StoryNode[] = [
     id: 'path_stop',
     title: '【直播中断】',
     background: 'dark',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '中断直播线',
     dialogues: [
       mkLine('阿海', '好...我关掉。', {
         sfx: [{ sfx: 'click', delay: 0, volume: 0.6 }],
@@ -1527,6 +1541,8 @@ export const nodes: StoryNode[] = [
     title: '【紧急上浮】',
     background: 'ascent',
     bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '紧急上浮线',
     dialogues: [
       mkLine('老周', '没时间了！全部推进器最大功率！紧急上浮！', {
         sfx: [{ sfx: 'alarm', delay: 0, volume: 0.8 }, { sfx: 'door_slam', delay: 300, volume: 0.6 }],

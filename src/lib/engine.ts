@@ -7,7 +7,9 @@ import type {
   DialogueLine,
   DialogueVariant,
   AudioHint,
-  MemoryCondition
+  MemoryCondition,
+  RewindCheckpoint,
+  RewindEffect
 } from '../types/game';
 import { storyData } from '../data/story';
 import {
@@ -34,10 +36,21 @@ import {
   recordPlaythrough,
   isClueUnlocked
 } from './memory';
-import { playSFX } from './audio';
+import { playSFX, playSFXWithRewind } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
 import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition, getLockedEnding } from './trust';
 import type { TrustCondition, NextNodeBranch } from '../types/game';
+import {
+  createCheckpoint,
+  regenerateStability,
+  shuffleDanmakusWithSeed,
+  getActiveRewindEffect,
+  rewindState,
+  finalizeRewind,
+  initiateRewind
+} from './timeRewind';
+
+
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -386,9 +399,20 @@ export function goToNode(nodeId: string): void {
     console.error('Node not found:', nodeId);
     return;
   }
+
+  const rState = get(rewindState);
+  if (rState.isRewindMode && rState.activeRewind) {
+    finalizeRewind();
+  }
   
   clearDanmakus();
   setCurrentNode(nodeId);
+
+  if (targetNode.isRewindCheckpoint) {
+    createCheckpoint(targetNode.rewindCheckpointLabel || targetNode.title);
+  }
+
+  regenerateStability();
 
   triggerNodeMemoryHints(targetNode);
 
@@ -399,6 +423,34 @@ export function goToNode(nodeId: string): void {
   if (targetNode.danmakus && targetNode.danmakus.length > 0) {
     setTimeout(() => triggerDanmakusForDialogue(0), 300);
   }
+}
+
+export function rewindToCheckpoint(checkpoint: RewindCheckpoint): {
+  success: boolean;
+  reason?: string;
+} {
+  const result = initiateRewind(checkpoint);
+  if (!result.success) {
+    return result;
+  }
+
+  clearDanmakus();
+  clearDanmakuTimeouts();
+
+  gameState.update(state => ({
+    ...state,
+    currentNodeId: checkpoint.nodeId,
+    dialogueIndex: checkpoint.dialogueIndex,
+    variables: { ...checkpoint.snapshot.variables },
+    updatedAt: Date.now()
+  }));
+
+  const targetNode = getNode(checkpoint.nodeId);
+  if (targetNode?.danmakus && targetNode.danmakus.length > 0) {
+    setTimeout(() => triggerDanmakusForDialogue(checkpoint.dialogueIndex), 500);
+  }
+
+  return { success: true };
 }
 
 let danmakuTimeouts: number[] = [];
@@ -434,6 +486,7 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
   const fullText = dialogue.text;
   const totalTypingDuration = calculateTotalTypingDuration(fullText, charDelay);
   const corruptionLevel = getCurrentCorruption();
+  const rewindEffect = getActiveRewindEffect();
   
   let relevantDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== undefined) {
@@ -443,7 +496,9 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
     return d.timestamp >= baseTime && d.timestamp < baseTime + 10000;
   });
   
-  if (corruptionLevel > 25 && Math.random() < getDanmakuReorderChance(corruptionLevel)) {
+  if (rewindEffect?.danmakuReorderSeed !== undefined) {
+    relevantDanmakus = shuffleDanmakusWithSeed(relevantDanmakus, rewindEffect.danmakuReorderSeed);
+  } else if (corruptionLevel > 25 && Math.random() < getDanmakuReorderChance(corruptionLevel)) {
     relevantDanmakus = [...relevantDanmakus].sort(() => Math.random() - 0.5);
   }
   
@@ -461,18 +516,27 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
     }
     
     delay = calculateDanmakuDelay(delay, corruptionLevel);
+
+    if (rewindEffect?.danmakuReorderSeed !== undefined) {
+      delay = delay * (0.7 + Math.random() * 0.6);
+    }
     
     const timeout = window.setTimeout(() => {
       const corruptedDanmaku = { ...danmaku };
-      if (corruptionLevel > 35) {
-        corruptedDanmaku.content = glitchSubtitleText(danmaku.content, corruptionLevel * 0.6);
+      if (corruptionLevel > 35 || rewindEffect) {
+        const glitchIntensity = rewindEffect ? corruptionLevel * 0.8 : corruptionLevel * 0.6;
+        corruptedDanmaku.content = glitchSubtitleText(danmaku.content, glitchIntensity);
       }
-      if (corruptionLevel > 60 && Math.random() < 0.3) {
-        corruptedDanmaku.color = ['#ff0066', '#00ffcc', '#ffff00', '#ff6600', '#6600ff'][Math.floor(Math.random() * 5)];
+      if (corruptionLevel > 60 || rewindEffect?.danmakuReorderSeed !== undefined) {
+        if (Math.random() < (rewindEffect ? 0.5 : 0.3)) {
+          corruptedDanmaku.color = ['#ff0066', '#00ffcc', '#ffff00', '#ff6600', '#6600ff', '#ff9900', '#00ff66'][Math.floor(Math.random() * 7)];
+        }
       }
       addDanmaku(corruptedDanmaku);
       
-      const displayDuration = corruptionLevel > 70 ? 5000 + Math.random() * 3000 : 8000;
+      const displayDuration = (corruptionLevel > 70 || rewindEffect)
+        ? 5000 + Math.random() * 4000
+        : 8000;
       window.setTimeout(() => {
         removeDanmaku(danmaku.id);
       }, displayDuration);

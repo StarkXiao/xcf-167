@@ -1,6 +1,7 @@
 import type { SFXType, BGMType, MoodType } from '../types/game';
 import { signalCorruption, getAudioDistortionParams } from './signalCorruption';
 import { get } from 'svelte/store';
+import { logTriggeredSfx, getActiveRewindEffect, getSfxOverride } from './timeRewind';
 
 let audioContext: AudioContext | null = null;
 let bgmGain: GainNode | null = null;
@@ -208,9 +209,38 @@ export function stopBGM(): void {
 
 export function playSFX(type: SFXType, customVolume?: number): void {
   if (!audioContext || !sfxGain) return;
+
+  logTriggeredSfx(type);
+  
+  const vol = customVolume !== undefined ? customVolume : 1;
+  _playSFXInternal(type, vol);
+}
+
+export function playSFXWithRewind(type: SFXType, customVolume?: number): void {
+  if (!audioContext || !sfxGain) return;
+
+  const rewindEffect = getActiveRewindEffect();
+  const override = rewindEffect ? getSfxOverride(type, rewindEffect) : null;
+
+  const actualType = override ? override.sfx : type;
+  const actualDelay = override?.delay || 0;
+  const actualVolume = customVolume !== undefined ? customVolume : 1;
+
+  logTriggeredSfx(actualType);
+
+  if (actualDelay > 0) {
+    setTimeout(() => {
+      _playSFXInternal(actualType, actualVolume);
+    }, actualDelay);
+  } else {
+    _playSFXInternal(actualType, actualVolume);
+  }
+}
+
+function _playSFXInternal(type: SFXType, vol: number): void {
+  if (!audioContext || !sfxGain) return;
   
   const now = audioContext.currentTime;
-  const vol = customVolume !== undefined ? customVolume : 1;
   
   switch (type) {
     case 'click':

@@ -111,6 +111,8 @@ export interface StoryNode {
   endingDescription?: string;
   memoryDialogues?: DialogueLine[];
   memoryHints?: AudioHint[];
+  isRewindCheckpoint?: boolean;
+  rewindCheckpointLabel?: string;
 }
 
 export interface Ending {
@@ -333,6 +335,40 @@ export interface NextNodeBranch {
   trustCondition?: TrustCondition;
   memoryCondition?: MemoryCondition;
   priority?: number;
+}
+
+export interface RewindCheckpoint {
+  id: string;
+  nodeId: string;
+  dialogueIndex: number;
+  timestamp: number;
+  label?: string;
+  snapshot: {
+    variables: Record<string, string | number | boolean>;
+    danmakuOrder: string[];
+    triggeredSfx: string[];
+    unlockedClues: string[];
+  };
+}
+
+export interface RewindState {
+  isRewindMode: boolean;
+  stability: number;
+  maxStability: number;
+  checkpoints: RewindCheckpoint[];
+  rewindCount: number;
+  activeRewind: RewindCheckpoint | null;
+  rewindDanmakuShuffle: boolean;
+  rewireSfxTrigger: boolean;
+  rewindClueOverride: boolean;
+  lastRewindTime: number;
+}
+
+export interface RewindEffect {
+  danmakuReorderSeed?: number;
+  sfxOverride?: { originalSfx: SFXType; replacementSfx: SFXType; delay?: number }[];
+  clueAlteration?: { clueId: string; newValue: boolean }[];
+  stabilityCost: number;
 }
 
 

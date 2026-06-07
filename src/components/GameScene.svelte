@@ -56,7 +56,14 @@
     corruptionSeverity
   } from '../lib/signalCorruption';
   import { resetTrustState } from '../lib/trust';
-  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType } from '../types/game';
+  import {
+    rewindState,
+    canRewind,
+    stabilityLevel,
+    resetRewindState
+  } from '../lib/timeRewind';
+  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
+  import { getNode, rewindToCheckpoint } from '../lib/engine';
 
   export let onBackToMenu: () => void;
   export let onShowEndingsGallery: () => void;
@@ -69,7 +76,10 @@
   let currentEnding: Ending | null = null;
   let showGameMenu = false;
   let showTrustPanel = false;
+  let showRewindPanel = false;
   let lastNodeId = '';
+  let rewindMessage = '';
+  let showRewindMessage = false;
 
   function syncEvidenceToMemory(nodeId: string) {
     const state = get(evidenceBoard);
@@ -258,19 +268,28 @@
         closeEvidenceBoard();
       } else if (showTrustPanel) {
         showTrustPanel = false;
+      } else if (showRewindPanel) {
+        showRewindPanel = false;
       } else {
         showGameMenu = !showGameMenu;
       }
     } else if (e.key === 'e' || e.key === 'E') {
-      if ($evidenceBoard.canOpenBoard && !isEnding && !showGameMenu && !showTrustPanel) {
+      if ($evidenceBoard.canOpenBoard && !isEnding && !showGameMenu && !showTrustPanel && !showRewindPanel) {
         openEvidenceBoard();
       }
     } else if (e.key === 't' || e.key === 'T') {
-      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen) {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showRewindPanel) {
         showTrustPanel = !showTrustPanel;
       }
+    } else if (e.key === 'r' || e.key === 'R') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel) {
+        showRewindPanel = !showRewindPanel;
+        if (showRewindPanel) {
+          playSFX('click');
+        }
+      }
     } else if (e.key === ' ' || e.key === 'Enter') {
-      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel) {
+      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel && !showRewindPanel) {
         e.preventDefault();
         handleDialogueComplete();
       }
@@ -287,9 +306,11 @@
     resetEvidenceBoard();
     resetCorruption();
     resetTrustState();
+    resetRewindState();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
+    showRewindPanel = false;
     updateState();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
@@ -301,9 +322,11 @@
     resetEvidenceBoard();
     resetCorruption();
     resetTrustState();
+    resetRewindState();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
+    showRewindPanel = false;
     goToNode('start');
     updateState();
     triggerDanmakusForDialogue(0);
@@ -312,6 +335,35 @@
 
   function handleShowEndings() {
     onShowEndingsGallery();
+  }
+
+  function handleRewindCheckpoint(checkpoint: RewindCheckpoint) {
+    const result = rewindToCheckpoint(checkpoint);
+    if (result.success) {
+      showRewindPanel = false;
+      showRewindMessage = true;
+      rewindMessage = '时间回溯中...数据流正在重构';
+      setTimeout(() => {
+        showRewindMessage = false;
+        updateState();
+      }, 1500);
+    } else {
+      showRewindMessage = true;
+      rewindMessage = result.reason || '回溯失败';
+      setTimeout(() => {
+        showRewindMessage = false;
+      }, 2000);
+    }
+  }
+
+  function formatCheckpointTime(timestamp: number): string {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function getCheckpointNodeTitle(nodeId: string): string {
+    const node = getNode(nodeId);
+    return node?.title || nodeId;
   }
 
   onMount(() => {
@@ -400,28 +452,45 @@
     />
   {/if}
 
-  {#if !isEnding && !showGameMenu && $evidenceBoard.canOpenBoard}
+  {#if !isEnding && !showGameMenu}
     <button 
       class="menu-toggle"
       on:click|stopPropagation={() => { playSFX('click'); showGameMenu = true; }}
     >
       ☰
     </button>
-    <button 
-      class="evidence-toggle"
-      on:click|stopPropagation={() => { playSFX('notify'); openEvidenceBoard(); }}
-    >
-      🔍
-      {#if $evidenceBoard.collectedEvidence.length > 0}
-        <span class="evidence-badge">{$evidenceBoard.collectedEvidence.length}</span>
-      {/if}
-    </button>
+    {#if $evidenceBoard.canOpenBoard}
+      <button 
+        class="evidence-toggle"
+        on:click|stopPropagation={() => { playSFX('notify'); openEvidenceBoard(); }}
+      >
+        🔍
+        {#if $evidenceBoard.collectedEvidence.length > 0}
+          <span class="evidence-badge">{$evidenceBoard.collectedEvidence.length}</span>
+        {/if}
+      </button>
+    {/if}
     <button 
       class="trust-toggle"
       on:click|stopPropagation={() => { playSFX('click'); showTrustPanel = true; }}
     >
       👥
     </button>
+    <button 
+      class="rewind-toggle"
+      class:rewind-active={$rewindState.isRewindMode}
+      class:rewind-disabled={!$canRewind}
+      on:click|stopPropagation={() => { playSFX('sonar'); showRewindPanel = !showRewindPanel; }}
+    >
+      ⏪
+    </button>
+    <div class="stability-indicator" class:stability-critical={$stabilityLevel === 'critical'} class:stability-unstable={$stabilityLevel === 'unstable'} class:stability-fragile={$stabilityLevel === 'fragile'}>
+      <span class="stability-icon">◈</span>
+      <div class="stability-bar-wrap">
+        <div class="stability-bar" style="width: {($rewindState.stability / $rewindState.maxStability) * 100}%"></div>
+      </div>
+      <span class="stability-text">{$rewindState.stability}</span>
+    </div>
   {/if}
 
   <GameMenu 
@@ -437,6 +506,81 @@
 
   <TrustPanel isOpen={showTrustPanel} onClose={() => { showTrustPanel = false; }} />
   <TrustNotifications />
+
+  {#if showRewindPanel}
+    <div class="rewind-panel-backdrop" on:click|stopPropagation={() => { showRewindPanel = false; }}>
+      <div class="rewind-panel" on:click|stopPropagation>
+        <div class="rewind-panel-header">
+          <h3 class="rewind-panel-title">⏪ 时间回溯模式</h3>
+          <button class="rewind-close-btn" on:click={() => { showRewindPanel = false; }}>✕</button>
+        </div>
+        <div class="rewind-panel-info">
+          <div class="stability-display">
+            <span class="stability-label">时空稳定度</span>
+            <div class="stability-bar-large-wrap">
+              <div 
+                class="stability-bar-large" 
+                style="width: {($rewindState.stability / $rewindState.maxStability) * 100}%"
+                class:bar-critical={$stabilityLevel === 'critical'}
+                class:bar-unstable={$stabilityLevel === 'unstable'}
+                class:bar-fragile={$stabilityLevel === 'fragile'}
+              ></div>
+            </div>
+            <span class="stability-num">{$rewindState.stability} / {$rewindState.maxStability}</span>
+          </div>
+          <p class="rewind-warning">
+            ⚠️ 回溯将消耗稳定度，并可能导致弹幕顺序错乱、音效偏移、线索判定改变。
+          </p>
+          {#if $rewindState.rewindCount > 0}
+            <p class="rewind-count">
+              已回溯次数：{$rewindState.rewindCount} — 系统不稳定性随次数增加
+            </p>
+          {/if}
+        </div>
+        <div class="rewind-checkpoints-list">
+          <h4 class="checkpoints-title">可用时间锚点</h4>
+          {#if $rewindState.checkpoints.length === 0}
+            <p class="no-checkpoints">尚未检测到关键锚点...继续推进剧情以生成锚点。</p>
+          {:else}
+            {#each [...$rewindState.checkpoints].reverse() as checkpoint (checkpoint.id)}
+              <button 
+                class="checkpoint-item"
+                disabled={$rewindState.stability < 15}
+                on:click={() => handleRewindCheckpoint(checkpoint)}
+              >
+                <div class="checkpoint-info">
+                  <span class="checkpoint-label">{checkpoint.label || getCheckpointNodeTitle(checkpoint.nodeId)}</span>
+                  <span class="checkpoint-time">{formatCheckpointTime(checkpoint.timestamp)}</span>
+                </div>
+                <div class="checkpoint-meta">
+                  <span class="checkpoint-node">节点: {checkpoint.nodeId}</span>
+                  <span class="checkpoint-cost">消耗: 15+ 稳定度</span>
+                </div>
+                {#if checkpoint.snapshot.unlockedClues.length > 0}
+                  <div class="checkpoint-clues">
+                    🔍 已解锁 {checkpoint.snapshot.unlockedClues.length} 条线索
+                  </div>
+                {/if}
+              </button>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if showRewindMessage}
+    <div class="rewind-message-overlay">
+      <div class="rewind-message-content">
+        <div class="rewind-spinner"></div>
+        <p class="rewind-message-text">{rewindMessage}</p>
+      </div>
+    </div>
+  {/if}
+
+  {#if $rewindState.isRewindMode}
+    <div class="rewind-active-overlay"></div>
+  {/if}
 </div>
 
 <style>
@@ -673,6 +817,449 @@
       height: 36px;
       right: 100px;
       font-size: 0.9rem;
+    }
+  }
+
+  .rewind-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 160px;
+    width: 40px;
+    height: 40px;
+    background: rgba(20, 30, 60, 0.6);
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: #a0e8ff;
+  }
+
+  .rewind-toggle:hover, .rewind-toggle:active {
+    background: rgba(40, 80, 140, 0.85);
+    border-color: rgba(100, 200, 255, 0.7);
+    box-shadow: 0 0 15px rgba(100, 200, 255, 0.4);
+  }
+
+  .rewind-toggle.rewind-active {
+    background: rgba(60, 100, 200, 0.85);
+    border-color: rgba(150, 220, 255, 0.8);
+    box-shadow: 0 0 20px rgba(100, 200, 255, 0.6);
+    animation: rewindPulse 0.6s infinite;
+  }
+
+  .rewind-toggle.rewind-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  @keyframes rewindPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  .stability-indicator {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(10, 20, 40, 0.65);
+    border: 1px solid rgba(100, 200, 255, 0.25);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    z-index: 35;
+    font-family: 'Courier New', monospace;
+  }
+
+  .stability-icon {
+    font-size: 0.85rem;
+    color: #64d8ff;
+  }
+
+  .stability-bar-wrap {
+    width: 60px;
+    height: 6px;
+    background: rgba(50, 50, 80, 0.6);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .stability-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #64ff96, #64d8ff);
+    border-radius: 3px;
+    transition: width 0.4s ease, background 0.4s ease;
+  }
+
+  .stability-indicator.stability-fragile .stability-bar {
+    background: linear-gradient(90deg, #ffd864, #ff9650);
+  }
+
+  .stability-indicator.stability-unstable .stability-bar {
+    background: linear-gradient(90deg, #ff9650, #ff5050);
+  }
+
+  .stability-indicator.stability-critical .stability-bar {
+    background: linear-gradient(90deg, #ff3030, #ff0060);
+    animation: criticalBlink 0.5s infinite;
+  }
+
+  @keyframes criticalBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .stability-text {
+    font-size: 0.7rem;
+    color: #a0e8ff;
+    min-width: 22px;
+    text-align: right;
+  }
+
+  .rewind-panel-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 5, 15, 0.75);
+    backdrop-filter: blur(8px);
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .rewind-panel {
+    background: linear-gradient(180deg, rgba(10, 25, 55, 0.95), rgba(5, 15, 35, 0.98));
+    border: 1px solid rgba(100, 200, 255, 0.35);
+    border-radius: 14px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 40px rgba(80, 160, 255, 0.2), inset 0 1px 0 rgba(150, 220, 255, 0.1);
+  }
+
+  .rewind-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(100, 200, 255, 0.15);
+    background: rgba(20, 40, 80, 0.4);
+  }
+
+  .rewind-panel-title {
+    margin: 0;
+    font-size: 1rem;
+    color: #80dcff;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 10px rgba(100, 200, 255, 0.5);
+  }
+
+  .rewind-close-btn {
+    background: none;
+    border: none;
+    color: #8090a0;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .rewind-close-btn:hover {
+    background: rgba(255, 80, 80, 0.2);
+    color: #ff8080;
+  }
+
+  .rewind-panel-info {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(100, 200, 255, 0.1);
+  }
+
+  .stability-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .stability-label {
+    font-size: 0.8rem;
+    color: #80a0c0;
+    font-family: 'Courier New', monospace;
+    min-width: 72px;
+  }
+
+  .stability-bar-large-wrap {
+    flex: 1;
+    height: 10px;
+    background: rgba(40, 50, 80, 0.6);
+    border-radius: 5px;
+    overflow: hidden;
+    border: 1px solid rgba(100, 150, 200, 0.2);
+  }
+
+  .stability-bar-large {
+    height: 100%;
+    background: linear-gradient(90deg, #64ff96, #64d8ff);
+    border-radius: 5px;
+    transition: width 0.5s ease;
+  }
+
+  .stability-bar-large.bar-fragile {
+    background: linear-gradient(90deg, #ffd864, #ff9650);
+  }
+
+  .stability-bar-large.bar-unstable {
+    background: linear-gradient(90deg, #ff9650, #ff5050);
+  }
+
+  .stability-bar-large.bar-critical {
+    background: linear-gradient(90deg, #ff3030, #ff0060);
+    animation: barFlash 0.4s infinite;
+  }
+
+  @keyframes barFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  .stability-num {
+    font-size: 0.8rem;
+    color: #a0e8ff;
+    font-family: 'Courier New', monospace;
+    min-width: 56px;
+    text-align: right;
+  }
+
+  .rewind-warning {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #ffcc80;
+    line-height: 1.5;
+    padding: 8px 12px;
+    background: rgba(255, 150, 50, 0.08);
+    border-left: 3px solid rgba(255, 180, 80, 0.6);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .rewind-count {
+    margin: 10px 0 0;
+    font-size: 0.75rem;
+    color: #a080ff;
+    font-family: 'Courier New', monospace;
+  }
+
+  .rewind-checkpoints-list {
+    padding: 16px 20px 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .checkpoints-title {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: #80c0ff;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .no-checkpoints {
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+    color: #607080;
+    font-size: 0.85rem;
+    font-style: italic;
+    background: rgba(50, 60, 80, 0.2);
+    border-radius: 8px;
+    border: 1px dashed rgba(100, 150, 200, 0.2);
+  }
+
+  .checkpoint-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: rgba(20, 40, 75, 0.5);
+    border: 1px solid rgba(100, 180, 255, 0.2);
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .checkpoint-item:hover:not(:disabled) {
+    background: rgba(40, 80, 140, 0.65);
+    border-color: rgba(100, 200, 255, 0.5);
+    box-shadow: 0 0 15px rgba(100, 180, 255, 0.2);
+    transform: translateX(2px);
+  }
+
+  .checkpoint-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .checkpoint-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .checkpoint-label {
+    font-size: 0.9rem;
+    color: #c0e8ff;
+    font-weight: 500;
+  }
+
+  .checkpoint-time {
+    font-size: 0.7rem;
+    color: #80a0c0;
+    font-family: 'Courier New', monospace;
+  }
+
+  .checkpoint-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+  }
+
+  .checkpoint-node {
+    color: #608090;
+    font-family: 'Courier New', monospace;
+  }
+
+  .checkpoint-cost {
+    color: #ffa060;
+    font-family: 'Courier New', monospace;
+  }
+
+  .checkpoint-clues {
+    font-size: 0.72rem;
+    color: #90d0a0;
+    padding-top: 4px;
+    border-top: 1px dashed rgba(100, 200, 150, 0.2);
+  }
+
+  .rewind-message-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 10, 30, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .rewind-message-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .rewind-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(100, 200, 255, 0.2);
+    border-top: 3px solid #64d8ff;
+    border-radius: 50%;
+    animation: rewindSpin 0.8s linear infinite;
+    box-shadow: 0 0 20px rgba(100, 200, 255, 0.4);
+  }
+
+  @keyframes rewindSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .rewind-message-text {
+    margin: 0;
+    font-size: 1rem;
+    color: #80dcff;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 15px rgba(100, 200, 255, 0.6);
+    animation: textGlitch 0.3s infinite;
+  }
+
+  @keyframes textGlitch {
+    0%, 100% { transform: translate(0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+  }
+
+  .rewind-active-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 25;
+    background: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(100, 200, 255, 0.03) 3px,
+        rgba(100, 200, 255, 0.03) 6px
+      );
+    animation: rewindScan 2s linear infinite;
+    mix-blend-mode: screen;
+  }
+
+  @keyframes rewindScan {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  @media (max-width: 480px) {
+    .rewind-toggle {
+      width: 36px;
+      height: 36px;
+      right: 144px;
+      font-size: 0.9rem;
+    }
+
+    .stability-indicator {
+      padding: 3px 8px;
+      top: calc(8px + env(safe-area-inset-top));
+    }
+
+    .stability-bar-wrap {
+      width: 45px;
+    }
+
+    .rewind-panel {
+      max-height: 90vh;
+    }
+
+    .rewind-panel-header,
+    .rewind-panel-info,
+    .rewind-checkpoints-list {
+      padding-left: 14px;
+      padding-right: 14px;
     }
   }
 </style>
