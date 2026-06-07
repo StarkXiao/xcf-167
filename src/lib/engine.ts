@@ -36,6 +36,7 @@ import {
 } from './memory';
 import { playSFX } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
+import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition } from './trust';
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -194,8 +195,18 @@ export function advance(): void {
   if (node.effects) {
     applyEffect(node.effects);
   }
+
+  if (node.trustEffect) {
+    applyTrustEffect(node.trustEffect);
+  }
   
   if (canAdvance()) {
+    const stateBefore = get(gameState);
+    const currentDialogue = node.dialogues[stateBefore.dialogueIndex];
+    if (currentDialogue?.trustEffect) {
+      applyTrustEffect(currentDialogue.trustEffect);
+    }
+
     advanceDialogue();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
@@ -208,6 +219,12 @@ export function advance(): void {
   }
   
   if (isAtDialogueEnd()) {
+    const state = get(gameState);
+    const lastDialogue = node.dialogues[state.dialogueIndex];
+    if (lastDialogue?.trustEffect) {
+      applyTrustEffect(lastDialogue.trustEffect);
+    }
+
     if (node.isEnding && node.endingId) {
       unlockEnding(node.endingId);
       recordPlaythroughCompletion(node.endingId);
@@ -275,6 +292,7 @@ function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): strin
 
   const config = endingRedirectMap[currentNodeId];
   if (config) {
+    applyTrustEndingWeights(addEndingWeightModifier);
     const weightedEnding = selectWeightedEnding(config.candidates);
     if (weightedEnding) {
       return config.nodeMap[weightedEnding] || nextNodeId;
@@ -293,6 +311,10 @@ export function selectChoice(choiceId: string): void {
   
   if (choice.effect) {
     applyEffect(choice.effect);
+  }
+
+  if (choice.trustEffect) {
+    applyTrustEffect(choice.trustEffect);
   }
 
   processChoiceMemoryEffect(choice);

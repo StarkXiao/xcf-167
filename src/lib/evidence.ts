@@ -15,6 +15,7 @@ import {
   baseEndingWeights
 } from '../data/evidence';
 import { setVariable } from './store';
+import { applyTrustEffect } from './trust';
 
 function createInitialEndingWeights(): EndingWeight[] {
   return Object.entries(baseEndingWeights).map(([endingId, baseWeight]) => ({
@@ -251,8 +252,14 @@ export function attemptDeduction(ruleId: string): { success: boolean; feedback: 
     if (rule.outcome.clueUnlocked) {
       setVariable(rule.outcome.clueUnlocked, true);
     }
+    if (rule.outcome.trustEffect) {
+      applyTrustEffect(rule.outcome.trustEffect);
+    }
     return { success: true, feedback: rule.outcome.feedback };
   } else {
+    if (rule.outcome.wrongTrustEffect) {
+      applyTrustEffect(rule.outcome.wrongTrustEffect);
+    }
     return {
       success: false,
       feedback: '这个推理组合似乎不太对...再想想证据之间的关联。'

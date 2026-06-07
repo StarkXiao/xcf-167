@@ -1,9 +1,10 @@
 <script lang="ts">
   import { playSFX } from '../lib/audio';
-  import type { Choice } from '../types/game';
+  import type { Choice, CrewMemberId } from '../types/game';
   import { getChoiceDisplayText } from '../lib/engine';
   import { checkMemoryCondition } from '../lib/memory';
   import { signalCorruption, shouldHideChoice, glitchChoiceText, shouldScrambleChoices, getCurrentCorruption } from '../lib/signalCorruption';
+  import { getCrewMember } from '../lib/trust';
   import { get } from 'svelte/store';
 
   export let choices: Choice[];
@@ -12,14 +13,31 @@
   $: corruptionLevel = $signalCorruption.level;
   $: processedChoices = processChoices(choices);
 
-  function processChoices(inputChoices: Choice[]): { choice: Choice; displayText: string; visible: boolean; isMemory: boolean; glitchSeed: number }[] {
-    let result = inputChoices.map((choice, index) => ({
-      choice,
-      displayText: getChoiceDisplayText(choice),
-      visible: !shouldHideChoice(getCurrentCorruption(), index),
-      isMemory: !!(choice.memoryText && checkMemoryCondition(choice.memoryCondition)),
-      glitchSeed: Math.floor(Math.random() * 100000)
-    }));
+  function processChoices(inputChoices: Choice[]): { choice: Choice; displayText: string; visible: boolean; isMemory: boolean; glitchSeed: number; trustPreview?: { positive: number; negative: number; hint?: string } }[] {
+    let result = inputChoices.map((choice, index) => {
+      let trustPreview: { positive: number; negative: number; hint?: string } | undefined;
+      if (choice.trustEffect?.changes?.length) {
+        let positive = 0;
+        let negative = 0;
+        choice.trustEffect.changes.forEach(c => {
+          if (c.value > 0) positive += c.value;
+          else negative += Math.abs(c.value);
+        });
+        trustPreview = {
+          positive,
+          negative,
+          hint: choice.trustEffect.hintText
+        };
+      }
+      return {
+        choice,
+        displayText: getChoiceDisplayText(choice),
+        visible: !shouldHideChoice(getCurrentCorruption(), index),
+        isMemory: !!(choice.memoryText && checkMemoryCondition(choice.memoryCondition)),
+        glitchSeed: Math.floor(Math.random() * 100000),
+        trustPreview
+      };
+    });
     
     if (shouldScrambleChoices(getCurrentCorruption())) {
       result = [...result].sort(() => Math.random() - 0.5);
@@ -66,6 +84,16 @@
             {#if item.isMemory}
               <span class="memory-choice-tag">
                 {corruptionLevel >= 50 ? glitchChoiceText('新选项', corruptionLevel * 0.5) : '新选项'}
+              </span>
+            {/if}
+            {#if item.trustPreview && corruptionLevel < 40}
+              <span class="trust-preview">
+                {#if item.trustPreview.positive > 0}
+                  <span class="trust-preview-positive">+{item.trustPreview.positive} 信任</span>
+                {/if}
+                {#if item.trustPreview.negative > 0}
+                  <span class="trust-preview-negative">-{item.trustPreview.negative} 信任</span>
+                {/if}
               </span>
             {/if}
           </span>
@@ -192,6 +220,33 @@
     font-size: 0.7rem;
     color: #ffd890;
     flex-shrink: 0;
+  }
+
+  .trust-preview {
+    display: inline-flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .trust-preview-positive,
+  .trust-preview-negative {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+
+  .trust-preview-positive {
+    background: rgba(100, 255, 150, 0.15);
+    border: 1px solid rgba(100, 255, 150, 0.35);
+    color: #60d090;
+  }
+
+  .trust-preview-negative {
+    background: rgba(255, 100, 100, 0.15);
+    border: 1px solid rgba(255, 100, 100, 0.35);
+    color: #ff8080;
   }
 
   .choices-container.corrupted {

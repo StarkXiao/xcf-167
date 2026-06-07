@@ -15,6 +15,7 @@ export interface Choice {
   nextNodeId: string;
   condition?: StateCondition;
   effect?: StateEffect;
+  trustEffect?: TrustEffect;
   memoryCondition?: MemoryCondition;
   memoryText?: string;
   memoryEffect?: { clueToUnlock?: string };
@@ -82,6 +83,7 @@ export interface DialogueLine {
   mood?: MoodType;
   autoAdvance?: boolean;
   autoAdvanceDelay?: number;
+  trustEffect?: TrustEffect;
   memoryVariants?: DialogueVariant[];
   memoryHints?: AudioHint[];
   memoryCondition?: MemoryCondition;
@@ -98,6 +100,7 @@ export interface StoryNode {
   choices?: Choice[];
   nextNodeId?: string;
   effects?: StateEffect;
+  trustEffect?: TrustEffect;
   isEnding?: boolean;
   endingId?: string;
   endingTitle?: string;
@@ -173,6 +176,8 @@ export interface DeductionRule {
   outcome: {
     clueUnlocked?: string;
     endingWeights?: Record<string, number>;
+    trustEffect?: TrustEffect;
+    wrongTrustEffect?: TrustEffect;
     isCorrect: boolean;
     feedback: string;
   };
@@ -256,6 +261,52 @@ export interface CorruptionEffect {
   type: 'subtitle_glitch' | 'danmaku_delay' | 'audio_distort' | 'choice_hide' | 'visual_artifact';
   intensity: number;
   seed?: number;
+}
+
+export type CrewMemberId = 'ahai' | 'xiaolin' | 'laozhou' | 'suboshi';
+
+export type TrustLevel = 'hostile' | 'distrust' | 'neutral' | 'trust' | 'loyal';
+
+export interface CrewMember {
+  id: CrewMemberId;
+  name: string;
+  role: string;
+  avatar?: string;
+  description: string;
+}
+
+export interface TrustChange {
+  target: CrewMemberId | 'all';
+  value: number;
+  reason?: string;
+  source?: string;
+}
+
+export interface CrewTrustState {
+  memberId: CrewMemberId;
+  value: number;
+  level: TrustLevel;
+  history: { value: number; reason?: string; source?: string; timestamp: number }[];
+}
+
+export interface TrustState {
+  crew: Record<CrewMemberId, CrewTrustState>;
+  overallTrust: number;
+  activeNotifications: TrustNotification[];
+}
+
+export interface TrustNotification {
+  id: string;
+  target: CrewMemberId;
+  value: number;
+  reason?: string;
+  timestamp: number;
+  duration: number;
+}
+
+export interface TrustEffect {
+  changes: TrustChange[];
+  hintText?: string;
 }
 
 

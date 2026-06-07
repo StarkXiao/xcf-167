@@ -8,6 +8,8 @@
   import GameMenu from './GameMenu.svelte';
   import EndingScreen from './EndingScreen.svelte';
   import EvidenceBoard from './EvidenceBoard.svelte';
+  import TrustPanel from './TrustPanel.svelte';
+  import TrustNotifications from './TrustNotifications.svelte';
   import {
     gameState,
     activeDanmakus,
@@ -53,6 +55,7 @@
     signalCorruption,
     corruptionSeverity
   } from '../lib/signalCorruption';
+  import { resetTrustState } from '../lib/trust';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType } from '../types/game';
 
   export let onBackToMenu: () => void;
@@ -65,6 +68,7 @@
   let isEnding = false;
   let currentEnding: Ending | null = null;
   let showGameMenu = false;
+  let showTrustPanel = false;
   let lastNodeId = '';
 
   function syncEvidenceToMemory(nodeId: string) {
@@ -252,15 +256,21 @@
     if (e.key === 'Escape') {
       if ($evidenceBoard.isBoardOpen) {
         closeEvidenceBoard();
+      } else if (showTrustPanel) {
+        showTrustPanel = false;
       } else {
         showGameMenu = !showGameMenu;
       }
     } else if (e.key === 'e' || e.key === 'E') {
-      if ($evidenceBoard.canOpenBoard && !isEnding && !showGameMenu) {
+      if ($evidenceBoard.canOpenBoard && !isEnding && !showGameMenu && !showTrustPanel) {
         openEvidenceBoard();
       }
+    } else if (e.key === 't' || e.key === 'T') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen) {
+        showTrustPanel = !showTrustPanel;
+      }
     } else if (e.key === ' ' || e.key === 'Enter') {
-      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu) {
+      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel) {
         e.preventDefault();
         handleDialogueComplete();
       }
@@ -276,6 +286,7 @@
     loadState(slot.state);
     resetEvidenceBoard();
     resetCorruption();
+    resetTrustState();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
@@ -289,6 +300,7 @@
     resetGameState();
     resetEvidenceBoard();
     resetCorruption();
+    resetTrustState();
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
@@ -404,6 +416,12 @@
         <span class="evidence-badge">{$evidenceBoard.collectedEvidence.length}</span>
       {/if}
     </button>
+    <button 
+      class="trust-toggle"
+      on:click|stopPropagation={() => { playSFX('click'); showTrustPanel = true; }}
+    >
+      👥
+    </button>
   {/if}
 
   <GameMenu 
@@ -416,6 +434,9 @@
   {#if $evidenceBoard.isBoardOpen}
     <EvidenceBoard onClose={() => {}} />
   {/if}
+
+  <TrustPanel isOpen={showTrustPanel} onClose={() => { showTrustPanel = false; }} />
+  <TrustNotifications />
 </div>
 
 <style>
@@ -618,6 +639,40 @@
       height: 36px;
       right: 56px;
       font-size: 1rem;
+    }
+  }
+
+  .trust-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 112px;
+    width: 40px;
+    height: 40px;
+    background: rgba(30, 40, 70, 0.6);
+    border: 1px solid rgba(180, 160, 255, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .trust-toggle:hover, .trust-toggle:active {
+    background: rgba(60, 80, 140, 0.8);
+    border-color: rgba(180, 160, 255, 0.6);
+    box-shadow: 0 0 12px rgba(180, 160, 255, 0.3);
+  }
+
+  @media (max-width: 480px) {
+    .trust-toggle {
+      width: 36px;
+      height: 36px;
+      right: 100px;
+      font-size: 0.9rem;
     }
   }
 </style>

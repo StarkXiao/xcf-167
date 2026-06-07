@@ -149,11 +149,19 @@ export const nodes: StoryNode[] = [
     dialogues: [
       mkLine('老周', '深度800米，水压正常，船体一切正常。', {
         sfx: [{ sfx: 'hull_pressure', delay: 0, volume: 0.5 }],
-        mood: 'calm'
+        mood: 'calm',
+        trustEffect: {
+          changes: [{ target: 'laozhou', value: 5, reason: '专业报告' }],
+          hintText: '老周的冷静表现让你感到可靠'
+        }
       }),
       mkLine('苏博士', '看到了！一群管水母在左舷！', {
         sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
-        mood: 'urgent'
+        mood: 'urgent',
+        trustEffect: {
+          changes: [{ target: 'suboshi', value: 5, reason: '专业热情' }],
+          hintText: '苏博士对海洋生物的热情感染了你'
+        }
       }),
       mkLine('阿海', '观众朋友们看到了吗？这些生物在完全黑暗的环境中发着幽蓝的光——', {
         mood: 'normal'
@@ -176,8 +184,34 @@ export const nodes: StoryNode[] = [
       })
     ],
     choices: [
-      { id: 'c_fast', text: '快进至下潜3000米', nextNodeId: 'mid_dive', effect: { watched_intro: false } },
-      { id: 'c_normal', text: '正常速度继续观看', nextNodeId: 'early_sign', effect: { watched_intro: true, clue_count: 1 } },
+      {
+        id: 'c_fast',
+        text: '快进至下潜3000米',
+        nextNodeId: 'mid_dive',
+        effect: { watched_intro: false },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -5, reason: '跳过介绍' },
+            { target: 'xiaolin', value: -5, reason: '跳过介绍' }
+          ],
+          hintText: '你跳过了船员的自我介绍'
+        }
+      },
+      {
+        id: 'c_normal',
+        text: '正常速度继续观看',
+        nextNodeId: 'early_sign',
+        effect: { watched_intro: true, clue_count: 1 },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 5, reason: '耐心观看' },
+            { target: 'xiaolin', value: 5, reason: '耐心观看' },
+            { target: 'laozhou', value: 3, reason: '耐心观看' },
+            { target: 'suboshi', value: 3, reason: '耐心观看' }
+          ],
+          hintText: '你的耐心让你更了解每一位船员'
+        }
+      },
       {
         id: 'c_ng_hint',
         text: '直接搜索弹幕关键词「07」',
@@ -186,7 +220,14 @@ export const nodes: StoryNode[] = [
         memoryCondition: { anyClues: ['previous_incident', 'crew_knew'], playthroughAtLeast: 2 },
         condition: { clue_count: 1 },
         effect: { watched_intro: true, clue_count: 2, clue_danmaku_deep: true },
-        memoryEffect: { clueToUnlock: 'protocol_hint_remembered' }
+        memoryEffect: { clueToUnlock: 'protocol_hint_remembered' },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -10, reason: '怀疑隐瞒' },
+            { target: 'laozhou', value: -10, reason: '怀疑隐瞒' }
+          ],
+          hintText: '你直接怀疑苏博士和老周隐瞒了什么'
+        }
       }
     ]
   },
@@ -333,9 +374,44 @@ export const nodes: StoryNode[] = [
       })
     ],
     choices: [
-      { id: 'c_stay', text: '观察船员们的反应（细致分析）', nextNodeId: 'analyze_crew', effect: { analyze_mode: 'crew', trust_crew: true } },
-      { id: 'c_danmaku', text: '仔细查看弹幕（寻找知情人）', nextNodeId: 'analyze_danmaku', effect: { analyze_mode: 'danmaku', clue_danmaku: true } },
-      { id: 'c_creature', text: '放大画面看那个生物', nextNodeId: 'analyze_creature', effect: { analyze_mode: 'creature', saw_creature: true } },
+      {
+        id: 'c_stay',
+        text: '观察船员们的反应（细致分析）',
+        nextNodeId: 'analyze_crew',
+        effect: { analyze_mode: 'crew', trust_crew: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 8, reason: '关注其状态' },
+            { target: 'xiaolin', value: 8, reason: '关注其状态' },
+            { target: 'laozhou', value: 5, reason: '关注其状态' },
+            { target: 'suboshi', value: 5, reason: '关注其状态' }
+          ],
+          hintText: '你仔细观察每位船员的反应，表现出对他们的关心'
+        }
+      },
+      {
+        id: 'c_danmaku',
+        text: '仔细查看弹幕（寻找知情人）',
+        nextNodeId: 'analyze_danmaku',
+        effect: { analyze_mode: 'danmaku', clue_danmaku: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -5, reason: '忽视船员' },
+            { target: 'xiaolin', value: -3, reason: '忽视船员' }
+          ],
+          hintText: '你更关注弹幕而不是船员的状态'
+        }
+      },
+      {
+        id: 'c_creature',
+        text: '放大画面看那个生物',
+        nextNodeId: 'analyze_creature',
+        effect: { analyze_mode: 'creature', saw_creature: true },
+        trustEffect: {
+          changes: [{ target: 'suboshi', value: 10, reason: '共同研究兴趣' }],
+          hintText: '苏博士注意到你对深海生物同样充满好奇'
+        }
+      },
       {
         id: 'c_ng_skip_analysis',
         text: '跳过分析，直接查看协议07相关记录',
@@ -343,7 +419,14 @@ export const nodes: StoryNode[] = [
         nextNodeId: 'analyze_danmaku',
         memoryCondition: { requiredClues: ['previous_incident'], playthroughAtLeast: 2 },
         effect: { analyze_mode: 'danmaku', clue_danmaku: true, clue_danmaku_deep: true },
-        memoryEffect: { clueToUnlock: 'fast_path_ng' }
+        memoryEffect: { clueToUnlock: 'fast_path_ng' },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -15, reason: '直接质疑' },
+            { target: 'laozhou', value: -15, reason: '直接质疑' }
+          ],
+          hintText: '你直接质疑苏博士和老周隐瞒了协议07的真相'
+        }
       }
     ],
     danmakus: [
@@ -552,10 +635,65 @@ export const nodes: StoryNode[] = [
       })
     ],
     choices: [
-      { id: 'c_keep_live', text: '坚持直播（阿海的选择）', nextNodeId: 'path_live', condition: { analyze_mode: 'crew' }, effect: { path: 'live', trust_contract: true } },
-      { id: 'c_keep_live_2', text: '坚持直播（继续收集证据）', nextNodeId: 'path_live', effect: { path: 'live', evidence_first: true } },
-      { id: 'c_stop_live', text: '关掉直播（听苏博士的）', nextNodeId: 'path_stop', effect: { path: 'stop', trust_su: true } },
-      { id: 'c_emergency', text: '紧急上浮（老周的方案）', nextNodeId: 'path_ascent', condition: { clue_count: 3 }, effect: { path: 'ascent', trust_zhou: true } },
+      {
+        id: 'c_keep_live',
+        text: '坚持直播（阿海的选择）',
+        nextNodeId: 'path_live',
+        condition: { analyze_mode: 'crew' },
+        effect: { path: 'live', trust_contract: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 20, reason: '支持其决定' },
+            { target: 'xiaolin', value: 5, reason: '尊重阿海' },
+            { target: 'suboshi', value: -15, reason: '违背其建议' },
+            { target: 'laozhou', value: -5, reason: '不采纳专业意见' }
+          ],
+          hintText: '你支持阿海坚持直播的决定'
+        }
+      },
+      {
+        id: 'c_keep_live_2',
+        text: '坚持直播（继续收集证据）',
+        nextNodeId: 'path_live',
+        effect: { path: 'live', evidence_first: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 10, reason: '部分支持' },
+            { target: 'suboshi', value: -10, reason: '违背其建议' }
+          ],
+          hintText: '你决定继续直播以收集更多证据'
+        }
+      },
+      {
+        id: 'c_stop_live',
+        text: '关掉直播（听苏博士的）',
+        nextNodeId: 'path_stop',
+        effect: { path: 'stop', trust_su: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 20, reason: '采纳其建议' },
+            { target: 'laozhou', value: 10, reason: '听从专业判断' },
+            { target: 'ahai', value: -10, reason: '否定其选择' }
+          ],
+          hintText: '你采纳苏博士的建议关掉了直播'
+        }
+      },
+      {
+        id: 'c_emergency',
+        text: '紧急上浮（老周的方案）',
+        nextNodeId: 'path_ascent',
+        condition: { clue_count: 3 },
+        effect: { path: 'ascent', trust_zhou: true },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 25, reason: '信任其专业判断' },
+            { target: 'xiaolin', value: 10, reason: '选择安全方案' },
+            { target: 'suboshi', value: 5, reason: '稳妥选择' },
+            { target: 'ahai', value: -5, reason: '放弃直播' }
+          ],
+          hintText: '你完全信任老周的专业判断，选择紧急上浮'
+        }
+      },
       {
         id: 'c_ng_hack_path',
         text: '启动回溯协议 — 改写直播数据流',
@@ -563,7 +701,13 @@ export const nodes: StoryNode[] = [
         nextNodeId: 'path_live',
         memoryCondition: { requiredClues: ['full_truth'], playthroughAtLeast: 3 },
         effect: { path: 'live', hack_activated: true, clue_count: 5 },
-        memoryEffect: { clueToUnlock: 'rewrite_protocol_activated' }
+        memoryEffect: { clueToUnlock: 'rewrite_protocol_activated' },
+        trustEffect: {
+          changes: [
+            { target: 'all', value: -20, reason: '你知道得太多了' }
+          ],
+          hintText: '船员们似乎意识到...你并不是第一次来到这里'
+        }
       }
     ]
   },
@@ -853,8 +997,37 @@ export const nodes: StoryNode[] = [
       })
     ],
     choices: [
-      { id: 'c_trust_su', text: '相信苏博士的计划', nextNodeId: 'ending_resolve_stop', effect: { full_trust: true } },
-      { id: 'c_doubt', text: '他们在隐瞒更多东西...', nextNodeId: 'ending_resolve_stop', condition: { clue_danmaku_deep: true }, effect: { doubt: true } }
+      {
+        id: 'c_trust_su',
+        text: '相信苏博士的计划',
+        nextNodeId: 'ending_resolve_stop',
+        effect: { full_trust: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 30, reason: '完全信任' },
+            { target: 'laozhou', value: 25, reason: '信任其方案' },
+            { target: 'ahai', value: 10, reason: '选择合作' },
+            { target: 'xiaolin', value: 10, reason: '选择合作' }
+          ],
+          hintText: '你选择完全信任苏博士和老周的计划'
+        }
+      },
+      {
+        id: 'c_doubt',
+        text: '他们在隐瞒更多东西...',
+        nextNodeId: 'ending_resolve_stop',
+        condition: { clue_danmaku_deep: true },
+        effect: { doubt: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -30, reason: '深度怀疑' },
+            { target: 'laozhou', value: -25, reason: '深度怀疑' },
+            { target: 'ahai', value: -10, reason: '怀疑所有人' },
+            { target: 'xiaolin', value: -10, reason: '怀疑所有人' }
+          ],
+          hintText: '你确信他们隐瞒了更多真相'
+        }
+      }
     ]
   },
   {
