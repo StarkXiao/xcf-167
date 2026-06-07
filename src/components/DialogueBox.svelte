@@ -4,6 +4,7 @@
   import { settings } from '../lib/store';
   import { playSFX, playTypingSound, playBGM } from '../lib/audio';
   import type { DialogueLine, AudioTrigger, MoodType } from '../types/game';
+  import { getEffectiveDialogue } from '../lib/engine';
 
   export let dialogue: DialogueLine | null;
   export let onComplete: () => void;
@@ -20,6 +21,7 @@
   let sfxTimeouts: number[] = [];
   let autoAdvanceTimeout: number | null = null;
   let firedSfx = new Set<number>();
+  let isMemoryVariant = false;
 
   $: textSpeed = $settings.textSpeed;
 
@@ -67,12 +69,15 @@
   function startTyping() {
     clearAllTimeouts();
     if (!dialogue) return;
+
+    const effective = getEffectiveDialogue(dialogue);
+    isMemoryVariant = effective.isMemoryVariant;
     
     displayedText = '';
     isComplete = false;
     isTyping.set(true);
     
-    const fullText = dialogue.text;
+    const fullText = effective.text;
     const mood = dialogue.mood;
     const charDelay = getCharDelay(mood, dialogue.baseTypingSpeed);
     const soundInterval = getTypingSoundInterval(mood);
@@ -145,7 +150,8 @@
   function completeTyping() {
     clearAllTimeouts();
     if (dialogue) {
-      displayedText = dialogue.text;
+      const effective = getEffectiveDialogue(dialogue);
+      displayedText = effective.text;
     }
     isComplete = true;
     isTyping.set(false);
@@ -153,7 +159,8 @@
     dispatch('lineComplete', { text: dialogue?.text || '' });
     
     if (dialogue?.autoAdvance) {
-      const delay = dialogue.autoAdvanceDelay || Math.max(1500, dialogue.text.length * 60);
+      const effective = getEffectiveDialogue(dialogue);
+      const delay = dialogue.autoAdvanceDelay || Math.max(1500, effective.text.length * 60);
       autoAdvanceTimeout = window.setTimeout(() => {
         onComplete();
       }, delay);
@@ -185,8 +192,11 @@
 <div class="dialogue-box" on:click={handleClick} role="button" tabindex="0" on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}>
   {#if dialogue}
     {#if dialogue.speaker}
-      <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'}>
+      <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'} class:memory={isMemoryVariant}>
         {dialogue.speaker}
+        {#if isMemoryVariant}
+          <span class="memory-tag">回忆</span>
+        {/if}
       </div>
     {/if}
     <div 
@@ -195,6 +205,7 @@
       class:scared-text={dialogue.mood === 'scared'}
       class:whisper-text={dialogue.mood === 'whisper'}
       class:urgent-text={dialogue.mood === 'urgent'}
+      class:memory-text={isMemoryVariant}
     >
       {displayedText}
       {#if !isComplete}
@@ -256,6 +267,22 @@
     color: #c0c0c0;
   }
 
+  .speaker-name.memory {
+    background: linear-gradient(135deg, rgba(200, 150, 80, 0.7), rgba(150, 100, 40, 0.7));
+    border-color: rgba(255, 200, 100, 0.5);
+    color: #ffe8c0;
+  }
+
+  .memory-tag {
+    margin-left: 8px;
+    padding: 1px 8px;
+    background: rgba(255, 200, 100, 0.2);
+    border: 1px solid rgba(255, 200, 100, 0.4);
+    border-radius: 10px;
+    font-size: 0.7rem;
+    color: #ffd890;
+  }
+
   .dialogue-text {
     background: rgba(10, 25, 45, 0.9);
     border: 1px solid rgba(100, 180, 255, 0.3);
@@ -288,6 +315,13 @@
   .urgent-text {
     color: #ffe0a0;
     font-weight: 500;
+  }
+
+  .memory-text {
+    background: rgba(40, 30, 15, 0.9);
+    border: 1px solid rgba(255, 200, 100, 0.4);
+    color: #ffe8c0;
+    box-shadow: 0 0 20px rgba(255, 180, 80, 0.15);
   }
 
   .cursor {

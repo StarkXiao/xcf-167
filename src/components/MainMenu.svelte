@@ -2,6 +2,8 @@
   import { playSFX, initAudio, resumeAudio } from '../lib/audio';
   import { loadSaveSlots, hasAnySave, type GameSettings } from '../lib/storage';
   import type { SaveSlot } from '../types/game';
+  import { getMemorySummaryForMenu, hasAnyMemory, currentPlaythrough } from '../lib/memory';
+  import { getAllEndings } from '../lib/engine';
 
   export let onNewGame: () => void;
   export let onContinue: (slot: SaveSlot) => void;
@@ -10,6 +12,12 @@
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
+  let memorySummary = getMemorySummaryForMenu();
+  let allEndings = getAllEndings();
+
+  function refreshMemorySummary() {
+    memorySummary = getMemorySummaryForMenu();
+  }
 
   function loadSlots() {
     saveSlots = loadSaveSlots();
@@ -49,6 +57,12 @@
     playSFX('click');
     showLoadMenu = false;
   }
+
+  function getLatestEndingTitle(): string | null {
+    if (!memorySummary.latestEnding) return null;
+    const ending = allEndings.find(e => e.id === memorySummary.latestEnding?.id);
+    return ending?.title || null;
+  }
 </script>
 
 <div class="menu-container">
@@ -64,12 +78,40 @@
         <h1 class="game-title">深海直播事故</h1>
         <p class="subtitle">DEEP SEA LIVE INCIDENT</p>
         <div class="timestamp">2047.06.12 · 03:17:42</div>
+
+        {#if $hasAnyMemory}
+          <div class="memory-summary" style="animation: fadeIn 1s ease-out 0.5s both;">
+            <div class="memory-row">
+              <span class="memory-label">第 {$currentPlaythrough} 周目</span>
+              <span class="memory-divider">·</span>
+              <span class="memory-label">已解锁 {memorySummary.endingsCount}/{allEndings.length} 结局</span>
+              {#if memorySummary.cluesCount > 0}
+                <span class="memory-divider">·</span>
+                <span class="memory-label clue-label">🔍 线索 × {memorySummary.cluesCount}</span>
+              {/if}
+            </div>
+            {#if getLatestEndingTitle()}
+              <div class="last-ending">
+                <span class="last-ending-label">上次结局:</span>
+                <span class="last-ending-title">{getLatestEndingTitle()}</span>
+              </div>
+            {/if}
+            {#if memorySummary.playthrough > 1}
+              <div class="memory-hint">
+                <span class="hint-icon">✦</span>
+                <span>你已发现一些隐藏线索，新周目中可能出现不同的对话和选项...</span>
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <div class="menu-buttons">
         <button class="menu-btn primary" on:click={handleNewGame}>
           <span class="btn-icon">▶</span>
-          <span class="btn-text">开始新游戏</span>
+          <span class="btn-text">
+            {$hasAnyMemory ? `开始第 ${$currentPlaythrough} 周目` : '开始新游戏'}
+          </span>
         </button>
 
         {#if hasAnySave()}
@@ -81,7 +123,12 @@
 
         <button class="menu-btn" on:click={handleEndings}>
           <span class="btn-icon">📖</span>
-          <span class="btn-text">结局收集</span>
+          <span class="btn-text">
+            结局收集
+            {#if memorySummary.endingsCount > 0}
+              <span class="menu-badge">{memorySummary.endingsCount}/{allEndings.length}</span>
+            {/if}
+          </span>
         </button>
 
         <button class="menu-btn" on:click={handleSettings}>
@@ -181,6 +228,87 @@
     color: #ff6b6b;
     opacity: 0.8;
     animation: pulse 2s infinite;
+  }
+
+  .memory-summary {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: rgba(30, 50, 80, 0.4);
+    border: 1px solid rgba(255, 200, 100, 0.25);
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+  }
+
+  .memory-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .memory-label {
+    font-size: 0.85rem;
+    color: #a0c0e0;
+  }
+
+  .memory-label.clue-label {
+    color: #ffd890;
+  }
+
+  .memory-divider {
+    color: rgba(255, 200, 100, 0.4);
+    font-size: 0.7rem;
+  }
+
+  .last-ending {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .last-ending-label {
+    font-size: 0.75rem;
+    color: #6a8aaa;
+  }
+
+  .last-ending-title {
+    font-size: 0.8rem;
+    color: #ffd890;
+    font-weight: 500;
+  }
+
+  .memory-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 200, 100, 0.15);
+  }
+
+  .hint-icon {
+    color: #ffd890;
+    font-size: 0.9rem;
+  }
+
+  .memory-hint span:last-child {
+    font-size: 0.75rem;
+    color: #c0a070;
+    font-style: italic;
+  }
+
+  .menu-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: rgba(100, 180, 255, 0.2);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    color: #8ab0d0;
   }
 
   .menu-buttons {

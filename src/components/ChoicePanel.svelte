@@ -1,6 +1,8 @@
 <script lang="ts">
   import { playSFX } from '../lib/audio';
   import type { Choice } from '../types/game';
+  import { getChoiceDisplayText } from '../lib/engine';
+  import { checkMemoryCondition } from '../lib/memory';
 
   export let choices: Choice[];
   export let onSelect: (choiceId: string) => void;
@@ -8,6 +10,10 @@
   function handleSelect(choice: Choice) {
     playSFX('select');
     onSelect(choice.id);
+  }
+
+  function isMemoryChoice(choice: Choice): boolean {
+    return !!(choice.memoryText && checkMemoryCondition(choice.memoryCondition));
   }
 </script>
 
@@ -17,11 +23,17 @@
     {#each choices as choice, i}
       <button 
         class="choice-btn"
+        class:memory-choice={isMemoryChoice(choice)}
         on:click={() => handleSelect(choice)}
         style="animation-delay: {i * 0.1}s"
       >
-        <span class="choice-index">{i + 1}</span>
-        <span class="choice-text">{choice.text}</span>
+        <span class="choice-index" class:memory-index={isMemoryChoice(choice)}>{i + 1}</span>
+        <span class="choice-text">
+          {getChoiceDisplayText(choice)}
+          {#if isMemoryChoice(choice)}
+            <span class="memory-choice-tag">新选项</span>
+          {/if}
+        </span>
       </button>
     {/each}
   </div>
@@ -96,6 +108,38 @@
   .choice-text {
     flex: 1;
     line-height: 1.5;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .choice-btn.memory-choice {
+    background: rgba(60, 45, 20, 0.9);
+    border-color: rgba(255, 200, 100, 0.5);
+    color: #ffe8c0;
+  }
+
+  .choice-btn.memory-choice:hover,
+  .choice-btn.memory-choice:active {
+    background: rgba(100, 75, 30, 0.95);
+    border-color: rgba(255, 200, 100, 0.8);
+    box-shadow: 0 0 20px rgba(255, 180, 80, 0.25);
+  }
+
+  .choice-index.memory-index {
+    background: linear-gradient(135deg, #c89650, #966428);
+  }
+
+  .memory-choice-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(255, 200, 100, 0.2);
+    border: 1px solid rgba(255, 200, 100, 0.4);
+    border-radius: 10px;
+    font-size: 0.7rem;
+    color: #ffd890;
+    flex-shrink: 0;
   }
 
   @media (max-width: 480px) {

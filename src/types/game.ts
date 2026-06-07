@@ -15,6 +15,9 @@ export interface Choice {
   nextNodeId: string;
   condition?: StateCondition;
   effect?: StateEffect;
+  memoryCondition?: MemoryCondition;
+  memoryText?: string;
+  memoryEffect?: { clueToUnlock?: string };
 }
 
 export interface StateCondition {
@@ -43,6 +46,31 @@ export interface AudioTrigger {
   volume?: number;
 }
 
+export interface DialogueVariant {
+  text: string;
+  condition?: StateCondition;
+  memoryCondition?: MemoryCondition;
+  isNewGamePlus?: boolean;
+}
+
+export interface MemoryCondition {
+  requiredClues?: string[];
+  requiredEndings?: string[];
+  requiredEvidence?: string[];
+  playthroughAtLeast?: number;
+  anyClues?: string[];
+}
+
+export interface AudioHint {
+  id: string;
+  memoryCondition: MemoryCondition;
+  sfx: SFXType;
+  volume?: number;
+  delay?: number;
+  oncePerPlaythrough?: boolean;
+  playthroughExclusive?: boolean;
+}
+
 export interface DialogueLine {
   speaker: string;
   text: string;
@@ -54,6 +82,10 @@ export interface DialogueLine {
   mood?: MoodType;
   autoAdvance?: boolean;
   autoAdvanceDelay?: number;
+  memoryVariants?: DialogueVariant[];
+  memoryHints?: AudioHint[];
+  memoryCondition?: MemoryCondition;
+  isMemoryLine?: boolean;
 }
 
 export interface StoryNode {
@@ -70,6 +102,8 @@ export interface StoryNode {
   endingId?: string;
   endingTitle?: string;
   endingDescription?: string;
+  memoryDialogues?: DialogueLine[];
+  memoryHints?: AudioHint[];
 }
 
 export interface Ending {
@@ -181,3 +215,34 @@ export interface DragState {
   currentX: number;
   currentY: number;
 }
+
+export interface UnlockedClue {
+  id: string;
+  unlockedAt: number;
+  firstPlaythrough: number;
+  sourceNodeId?: string;
+  sourceEndingId?: string;
+}
+
+export interface PlaythroughRecord {
+  playthrough: number;
+  endingId?: string;
+  completedAt: number;
+  cluesUnlocked: string[];
+  evidenceCollected: string[];
+  nodesVisited: string[];
+  choicesMade: { nodeId: string; choiceId: string }[];
+}
+
+export interface GlobalMemory {
+  currentPlaythrough: number;
+  unlockedClues: Record<string, UnlockedClue>;
+  unlockedEvidenceIds: string[];
+  playthroughHistory: PlaythroughRecord[];
+  audioHintsTriggered: string[];
+  dialogueVariantsUsed: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+

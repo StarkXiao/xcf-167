@@ -1,7 +1,8 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { GameState, GameScene } from '../types/game';
 import { createNewGameState, loadSettings, type GameSettings } from './storage';
 import type { Danmaku } from '../types/game';
+import { unlockedEndingIdsFromMemory } from './memory';
 
 export const gameState = writable<GameState>(createNewGameState());
 export const currentScene = writable<GameScene>('menu');
@@ -12,7 +13,13 @@ export const isTyping = writable(false);
 export const showMenu = writable(false);
 
 export const currentVariables = derived(gameState, $state => $state.variables);
-export const unlockedEndings = derived(gameState, $state => $state.unlockedEndings);
+export const unlockedEndings = derived(
+  [gameState, unlockedEndingIdsFromMemory],
+  ([$state, $memoryEndings]) => {
+    const combined = new Set([...$state.unlockedEndings, ...$memoryEndings]);
+    return Array.from(combined);
+  }
+);
 
 export function setVariable(key: string, value: string | number | boolean): void {
   gameState.update(state => ({

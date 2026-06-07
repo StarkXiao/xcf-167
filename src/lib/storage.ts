@@ -1,4 +1,5 @@
-import type { GameState, SaveSlot } from '../types/game';
+import type { GameState, SaveSlot, GlobalMemory } from '../types/game';
+import { importMemory, exportMemory } from './memory';
 
 const SAVE_KEY = 'deep_sea_save_slots';
 const SETTINGS_KEY = 'deep_sea_settings';
@@ -30,6 +31,10 @@ export const defaultGameState: GameState = {
   updatedAt: Date.now()
 };
 
+export interface SaveSlotWithMemory extends SaveSlot {
+  memorySnapshot?: GlobalMemory;
+}
+
 export function createNewGameState(): GameState {
   return {
     ...defaultGameState,
@@ -44,7 +49,7 @@ export function loadSaveSlots(): SaveSlot[] {
   try {
     const data = localStorage.getItem(SAVE_KEY);
     if (data) {
-      const slots = JSON.parse(data) as SaveSlot[];
+      const slots = JSON.parse(data) as SaveSlotWithMemory[];
       return slots.length > 0 ? slots : [];
     }
   } catch (e) {
@@ -54,12 +59,14 @@ export function loadSaveSlots(): SaveSlot[] {
 }
 
 export function saveToSlot(slotId: number, state: GameState, preview: string): SaveSlot {
-  const slots = loadSaveSlots();
-  const slot: SaveSlot = {
+  const slots = loadSaveSlots() as SaveSlotWithMemory[];
+  const memorySnapshot = exportMemory();
+  const slot: SaveSlotWithMemory = {
     id: slotId,
     state: { ...state, updatedAt: Date.now() },
     savedAt: Date.now(),
-    preview
+    preview,
+    memorySnapshot
   };
   
   const existingIndex = slots.findIndex(s => s.id === slotId);
@@ -75,8 +82,12 @@ export function saveToSlot(slotId: number, state: GameState, preview: string): S
 }
 
 export function loadFromSlot(slotId: number): SaveSlot | null {
-  const slots = loadSaveSlots();
-  return slots.find(s => s.id === slotId) || null;
+  const slots = loadSaveSlots() as SaveSlotWithMemory[];
+  const slot = slots.find(s => s.id === slotId) || null;
+  if (slot?.memorySnapshot) {
+    importMemory(slot.memorySnapshot);
+  }
+  return slot;
 }
 
 export function deleteSlot(slotId: number): void {

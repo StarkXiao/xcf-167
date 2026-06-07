@@ -1,4 +1,14 @@
-import type { StoryNode, Choice, StateCondition, StateEffect, Danmaku } from '../types/game';
+import type {
+  StoryNode,
+  Choice,
+  StateCondition,
+  StateEffect,
+  Danmaku,
+  DialogueLine,
+  DialogueVariant,
+  AudioHint,
+  MemoryCondition
+} from '../types/game';
 import { storyData } from '../data/story';
 import {
   gameState,
@@ -14,6 +24,17 @@ import {
 } from './store';
 import { get } from 'svelte/store';
 import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier } from './evidence';
+import {
+  checkMemoryCondition,
+  selectDialogueVariant,
+  getApplicableAudioHints,
+  markAudioHintTriggered,
+  markDialogueVariantUsed,
+  unlockClue,
+  recordPlaythrough,
+  isClueUnlocked
+} from './memory';
+import { playSFX } from './audio';
 
 export function getNode(nodeId: string): StoryNode | undefined {
   return storyData.nodes.find(n => n.id === nodeId);
@@ -33,6 +54,13 @@ export function checkCondition(condition?: StateCondition): boolean {
   return true;
 }
 
+export function checkAllConditions(
+  stateCondition?: StateCondition,
+  memoryCondition?: MemoryCondition
+): boolean {
+  return checkCondition(stateCondition) && checkMemoryCondition(memoryCondition);
+}
+
 export function applyEffect(effect?: StateEffect): void {
   if (!effect) return;
   for (const [key, value] of Object.entries(effect)) {
@@ -43,7 +71,94 @@ export function applyEffect(effect?: StateEffect): void {
 export function getAvailableChoices(): Choice[] {
   const node = getCurrentNode();
   if (!node?.choices) return [];
-  return node.choices.filter(c => checkCondition(c.condition));
+  return node.choices.filter(c => checkAllConditions(c.condition, c.memoryCondition));
+}
+
+export function getChoiceDisplayText(choice: Choice): string {
+  if (choice.memoryText && checkMemoryCondition(choice.memoryCondition)) {
+    return choice.memoryText;
+  }
+  return choice.text;
+}
+
+export function getEffectiveDialogue(dialogue: DialogueLine): { text: string; isMemoryVariant: boolean; variant?: DialogueVariant } {
+  if (dialogue.memoryVariants && dialogue.memoryVariants.length > 0) {
+    const variant = selectDialogueVariant(dialogue.memoryVariants);
+    if (variant) {
+      const stateOk = variant.condition ? checkCondition(variant.condition) : true;
+      if (stateOk) {
+        return {
+          text: variant.text,
+          isMemoryVariant: true,
+          variant
+        };
+      }
+    }
+  }
+  return {
+    text: dialogue.text,
+    isMemoryVariant: false
+  };
+}
+
+export function triggerMemoryAudioHints(dialogue: DialogueLine): void {
+  const hints = dialogue.memoryHints || [];
+  const applicable = getApplicableAudioHints(hints);
+  applicable.forEach(hint => {
+    const delay = hint.delay || 0;
+    window.setTimeout(() => {
+      playSFX(hint.sfx, hint.volume);
+      markAudioHintTriggered(hint.id);
+    }, delay);
+  });
+}
+
+export function triggerNodeMemoryHints(node: StoryNode): void {
+  const hints = node.memoryHints || [];
+  const applicable = getApplicableAudioHints(hints);
+  applicable.forEach(hint => {
+    const delay = hint.delay || 0;
+    window.setTimeout(() => {
+      playSFX(hint.sfx, hint.volume);
+      markAudioHintTriggered(hint.id);
+    }, delay);
+  });
+}
+
+export function processChoiceMemoryEffect(choice: Choice): void {
+  if (choice.memoryEffect?.clueToUnlock) {
+    unlockClue(choice.memoryEffect.clueToUnlock);
+  }
+}
+
+export function unlockClueFromNode(clueId: string, nodeId: string): boolean {
+  return unlockClue(clueId, { nodeId });
+}
+
+export function getCurrentDialogueWithMemory(): { line: DialogueLine; effectiveText: string; isMemoryVariant: boolean } | null {
+  const node = getCurrentNode();
+  if (!node) return null;
+  const state = get(gameState);
+
+  let dialogues = node.dialogues;
+  if (node.memoryDialogues && node.memoryDialogues.length > 0) {
+    const allMemoryOk = node.memoryDialogues.every(d =>
+      d.memoryCondition ? checkMemoryCondition(d.memoryCondition) : true
+    );
+    if (allMemoryOk) {
+      dialogues = [...node.memoryDialogues, ...node.dialogues];
+    }
+  }
+
+  if (state.dialogueIndex >= dialogues.length) return null;
+  const line = dialogues[state.dialogueIndex];
+  const effective = getEffectiveDialogue(line);
+
+  return {
+    line,
+    effectiveText: effective.text,
+    isMemoryVariant: effective.isMemoryVariant
+  };
 }
 
 export function canAdvance(): boolean {
@@ -79,12 +194,18 @@ export function advance(): void {
     advanceDialogue();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
+
+    const nextDialogue = node.dialogues[state.dialogueIndex];
+    if (nextDialogue) {
+      triggerMemoryAudioHints(nextDialogue);
+    }
     return;
   }
   
   if (isAtDialogueEnd()) {
     if (node.isEnding && node.endingId) {
       unlockEnding(node.endingId);
+      recordPlaythroughCompletion(node.endingId);
       return;
     }
     
@@ -96,6 +217,29 @@ export function advance(): void {
       const redirectedNodeId = resolveEndingRedirect(node.id, node.nextNodeId);
       goToNode(redirectedNodeId);
     }
+  }
+}
+
+function recordPlaythroughCompletion(endingId: string): void {
+  const state = get(gameState);
+  const evidenceState = getEvidenceStateIds();
+  recordPlaythrough({
+    endingId,
+    cluesUnlocked: Object.keys(state.variables).filter(k => k.startsWith('clue') || k.startsWith('full_truth') || k.startsWith('creature') || k.startsWith('crew') || k.startsWith('previous') || k.startsWith('signal')),
+    evidenceCollected: evidenceState,
+    nodesVisited: state.visitedNodes,
+    choicesMade: []
+  });
+}
+
+function getEvidenceStateIds(): string[] {
+  try {
+    const { evidenceBoard } = require('./evidence');
+    const { get } = require('svelte/store');
+    const state = get(evidenceBoard);
+    return state.collectedEvidence.map((e: any) => e.id);
+  } catch {
+    return [];
   }
 }
 
@@ -142,12 +286,13 @@ export function selectChoice(choiceId: string): void {
   if (!node?.choices) return;
   
   const choice = node.choices.find(c => c.id === choiceId);
-  if (!choice || !checkCondition(choice.condition)) return;
+  if (!choice || !checkAllConditions(choice.condition, choice.memoryCondition)) return;
   
   if (choice.effect) {
     applyEffect(choice.effect);
   }
 
+  processChoiceMemoryEffect(choice);
   applyChoiceWeightModifier(node.id, choiceId);
   
   goToNode(choice.nextNodeId);
@@ -193,6 +338,12 @@ export function goToNode(nodeId: string): void {
   
   clearDanmakus();
   setCurrentNode(nodeId);
+
+  triggerNodeMemoryHints(targetNode);
+
+  if (targetNode.dialogues && targetNode.dialogues.length > 0) {
+    triggerMemoryAudioHints(targetNode.dialogues[0]);
+  }
   
   if (targetNode.danmakus && targetNode.danmakus.length > 0) {
     setTimeout(() => triggerDanmakusForDialogue(0), 300);

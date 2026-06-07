@@ -38,9 +38,11 @@
     getEndingById,
     triggerDanmakusForDialogue,
     triggerDanmakuAtChar,
-    clearDanmakuTimeouts
+    clearDanmakuTimeouts,
+    unlockClueFromNode
   } from '../lib/engine';
   import { playBGM, playSFX, initAudio, resumeAudio, stopBGM } from '../lib/audio';
+  import { currentPlaythrough, unlockEvidenceId } from '../lib/memory';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType } from '../types/game';
 
   export let onBackToMenu: () => void;
@@ -55,17 +57,43 @@
   let showGameMenu = false;
   let lastNodeId = '';
 
+  function syncEvidenceToMemory(nodeId: string) {
+    const state = get(evidenceBoard);
+    state.collectedEvidence.forEach(ev => {
+      unlockEvidenceId(ev.id);
+    });
+  }
+
+  function syncCluesFromVariables() {
+    const state = get(gameState);
+    Object.entries(state.variables).forEach(([key, value]) => {
+      if (value === true && (
+        key.startsWith('clue') ||
+        key.startsWith('creature_is_artificial') ||
+        key.startsWith('crew_knew') ||
+        key.startsWith('previous_incident') ||
+        key.startsWith('signal_response') ||
+        key.startsWith('full_truth')
+      )) {
+        unlockClueFromNode(key, lastNodeId);
+      }
+    });
+  }
+
   function updateState() {
     currentNode = getCurrentNode();
     if (!currentNode) return;
 
     if (currentNode.id !== lastNodeId) {
       collectEvidenceByNode(currentNode.id);
+      syncEvidenceToMemory(currentNode.id);
       lastNodeId = currentNode.id;
       if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
       }
     }
+
+    syncCluesFromVariables();
 
     const state = get(gameState);
     if (state.dialogueIndex < currentNode.dialogues.length) {
@@ -236,6 +264,9 @@
   {#if currentNode?.title}
     <div class="node-title-bar" style="animation: fadeIn 0.6s ease-out;">
       <span class="title-text">{currentNode.title}</span>
+      {#if $currentPlaythrough > 1}
+        <span class="playthrough-badge">第 {$currentPlaythrough} 周目</span>
+      {/if}
     </div>
   {/if}
 
@@ -317,6 +348,17 @@
     letter-spacing: 0.15em;
     text-shadow: 0 0 10px rgba(100, 180, 255, 0.5);
     opacity: 0.9;
+  }
+
+  .playthrough-badge {
+    margin-left: 12px;
+    padding: 2px 10px;
+    background: rgba(255, 200, 100, 0.15);
+    border: 1px solid rgba(255, 200, 100, 0.3);
+    border-radius: 10px;
+    font-size: 0.7rem;
+    color: #ffd890;
+    font-family: 'Courier New', monospace;
   }
 
   .menu-toggle {

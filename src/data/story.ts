@@ -69,10 +69,30 @@ export const nodes: StoryNode[] = [
       }),
       mkLine('', '你是一名数字取证分析师。三个月前，一场深海直播探险在全网直播中突然失联。\n今天，你收到了一份匿名邮件——里面是当时完整的直播数据备份。', {
         sfx: [{ sfx: 'water_drip', delay: 500 }, { sfx: 'water_drip', delay: 2000 }],
-        mood: 'calm'
+        mood: 'calm',
+        memoryVariants: [
+          {
+            memoryCondition: { playthroughAtLeast: 2 },
+            text: '你再次打开这份数据。上一次的分析让你发现了一些奇怪的线索...\n这一次，你决定从不同的角度重新审视一切。也许，真相就藏在那些被忽略的细节中。'
+          },
+          {
+            memoryCondition: { requiredClues: ['full_truth'] },
+            text: '你已经知道了全部真相——这是一场实验，而直播是实验的一部分。\n但你依然打开了这份数据。也许，还有什么被遗漏了？也许，这一次能救出更多人？\n屏幕角落的时间戳：03:17:42。它在对你微笑。'
+          }
+        ]
       })
     ],
     nextNodeId: 'intro_1',
+    memoryHints: [
+      {
+        id: 'hint_whisper_ng',
+        memoryCondition: { playthroughAtLeast: 2 },
+        sfx: 'whisper',
+        volume: 0.3,
+        delay: 500,
+        oncePerPlaythrough: true
+      }
+    ],
     danmakus: [
       mkDanmaku('d1', '深海爱好者', '终于开播了！！', 0, 1, 200, '#66ccff'),
       mkDanmaku('d2', '科技迷小王', '马里亚纳海沟？太敢了', 500, 1, 800),
@@ -157,7 +177,17 @@ export const nodes: StoryNode[] = [
     ],
     choices: [
       { id: 'c_fast', text: '快进至下潜3000米', nextNodeId: 'mid_dive', effect: { watched_intro: false } },
-      { id: 'c_normal', text: '正常速度继续观看', nextNodeId: 'early_sign', effect: { watched_intro: true, clue_count: 1 } }
+      { id: 'c_normal', text: '正常速度继续观看', nextNodeId: 'early_sign', effect: { watched_intro: true, clue_count: 1 } },
+      {
+        id: 'c_ng_hint',
+        text: '直接搜索弹幕关键词「07」',
+        memoryText: '【回忆线索】直接搜索弹幕关键词「协议07」',
+        nextNodeId: 'analyze_danmaku',
+        memoryCondition: { anyClues: ['previous_incident', 'crew_knew'], playthroughAtLeast: 2 },
+        condition: { clue_count: 1 },
+        effect: { watched_intro: true, clue_count: 2, clue_danmaku_deep: true },
+        memoryEffect: { clueToUnlock: 'protocol_hint_remembered' }
+      }
     ]
   },
   {
@@ -283,13 +313,38 @@ export const nodes: StoryNode[] = [
       }),
       mkLine('', '灯光中，你看到了一个巨大的轮廓。它有一双——或者说，类似眼睛的东西——正盯着潜水器。\n直播弹幕瞬间爆炸。', {
         sfx: [{ sfx: 'alarm', delay: 0, volume: 0.4 }, { sfx: 'static', delay: 500, volume: 0.5 }],
-        mood: 'tense'
+        mood: 'tense',
+        memoryVariants: [
+          {
+            memoryCondition: { requiredClues: ['creature_is_artificial'] },
+            text: '灯光中，你再次看到那个巨大的轮廓。这一次你注意到了——\n那不是眼睛，那是一个镜头。一个人造的、冰冷的、巨大的镜头。\n它在观察舱内的人，也在观察屏幕前的你。'
+          }
+        ],
+        memoryHints: [
+          {
+            id: 'hint_recognition_ping',
+            memoryCondition: { playthroughAtLeast: 2 },
+            sfx: 'sonar',
+            volume: 0.25,
+            delay: 1000,
+            oncePerPlaythrough: true
+          }
+        ]
       })
     ],
     choices: [
       { id: 'c_stay', text: '观察船员们的反应（细致分析）', nextNodeId: 'analyze_crew', effect: { analyze_mode: 'crew', trust_crew: true } },
       { id: 'c_danmaku', text: '仔细查看弹幕（寻找知情人）', nextNodeId: 'analyze_danmaku', effect: { analyze_mode: 'danmaku', clue_danmaku: true } },
-      { id: 'c_creature', text: '放大画面看那个生物', nextNodeId: 'analyze_creature', effect: { analyze_mode: 'creature', saw_creature: true } }
+      { id: 'c_creature', text: '放大画面看那个生物', nextNodeId: 'analyze_creature', effect: { analyze_mode: 'creature', saw_creature: true } },
+      {
+        id: 'c_ng_skip_analysis',
+        text: '跳过分析，直接查看协议07相关记录',
+        memoryText: '【回忆线索】直接调取「协议07」相关弹幕记录',
+        nextNodeId: 'analyze_danmaku',
+        memoryCondition: { requiredClues: ['previous_incident'], playthroughAtLeast: 2 },
+        effect: { analyze_mode: 'danmaku', clue_danmaku: true, clue_danmaku_deep: true },
+        memoryEffect: { clueToUnlock: 'fast_path_ng' }
+      }
     ],
     danmakus: [
       mkDanmaku('d23', '弹幕炸了', '????????????????', 0, 2, 100, '#ff6666'),
@@ -500,7 +555,16 @@ export const nodes: StoryNode[] = [
       { id: 'c_keep_live', text: '坚持直播（阿海的选择）', nextNodeId: 'path_live', condition: { analyze_mode: 'crew' }, effect: { path: 'live', trust_contract: true } },
       { id: 'c_keep_live_2', text: '坚持直播（继续收集证据）', nextNodeId: 'path_live', effect: { path: 'live', evidence_first: true } },
       { id: 'c_stop_live', text: '关掉直播（听苏博士的）', nextNodeId: 'path_stop', effect: { path: 'stop', trust_su: true } },
-      { id: 'c_emergency', text: '紧急上浮（老周的方案）', nextNodeId: 'path_ascent', condition: { clue_count: 3 }, effect: { path: 'ascent', trust_zhou: true } }
+      { id: 'c_emergency', text: '紧急上浮（老周的方案）', nextNodeId: 'path_ascent', condition: { clue_count: 3 }, effect: { path: 'ascent', trust_zhou: true } },
+      {
+        id: 'c_ng_hack_path',
+        text: '启动回溯协议 — 改写直播数据流',
+        memoryText: '【全周目解锁】启动回溯协议 — 改写直播数据流',
+        nextNodeId: 'path_live',
+        memoryCondition: { requiredClues: ['full_truth'], playthroughAtLeast: 3 },
+        effect: { path: 'live', hack_activated: true, clue_count: 5 },
+        memoryEffect: { clueToUnlock: 'rewrite_protocol_activated' }
+      }
     ]
   },
   {
