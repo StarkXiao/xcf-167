@@ -62,7 +62,7 @@
     if (currentNode.id !== lastNodeId) {
       collectEvidenceByNode(currentNode.id);
       lastNodeId = currentNode.id;
-      if (currentNode.id === 'intro_1') {
+      if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
       }
     }
@@ -217,8 +217,6 @@
     initAudio();
     resumeAudio();
     resetEvidenceBoard();
-    collectAllEvidence();
-    setCanOpenBoard(true);
     updateState();
     playBGM('deep');
     triggerDanmakusForDialogue(get(gameState).dialogueIndex);
