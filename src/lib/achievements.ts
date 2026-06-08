@@ -139,8 +139,25 @@ function checkAchievementCondition(condition: AchievementCondition): boolean {
   const gameVarPath = gState.variables.path as string | undefined;
   if (gameVarPath && !currentAndHistoryPaths.includes(gameVarPath)) currentAndHistoryPaths.push(gameVarPath);
 
-  const allHistoryMistakes = memory.playthroughHistory.reduce((sum, p) => sum + (p.mistakeCount || 0), 0);
-  const totalMistakes = allHistoryMistakes + achState.mistakeCountThisPlaythrough + achState.mistakeCountTotal;
+  const allPlaythroughMistakeCounts = memory.playthroughHistory.map(p => p.mistakeCount ?? -1);
+  const hasValidPerPlaythroughCounts = allPlaythroughMistakeCounts.every(c => c >= 0);
+
+  let totalAccumulatedMistakes: number;
+  if (hasValidPerPlaythroughCounts) {
+    totalAccumulatedMistakes = allPlaythroughMistakeCounts.reduce((sum, c) => sum + c, 0)
+      + achState.mistakeCountThisPlaythrough;
+  } else {
+    totalAccumulatedMistakes = achState.mistakeCountTotal + achState.mistakeCountThisPlaythrough;
+  }
+
+  let minPlaythroughMistakes: number;
+  if (hasValidPerPlaythroughCounts && allPlaythroughMistakeCounts.length > 0) {
+    minPlaythroughMistakes = Math.min(...allPlaythroughMistakeCounts, achState.mistakeCountThisPlaythrough);
+  } else if (memory.playthroughHistory.length > 0) {
+    minPlaythroughMistakes = Math.min(achState.mistakeCountTotal, achState.mistakeCountThisPlaythrough);
+  } else {
+    minPlaythroughMistakes = achState.mistakeCountThisPlaythrough;
+  }
 
   if (condition.requiredPlaythroughAtLeast) {
     if (memory.currentPlaythrough < condition.requiredPlaythroughAtLeast) return false;
@@ -189,11 +206,11 @@ function checkAchievementCondition(condition: AchievementCondition): boolean {
   }
 
   if (condition.requiredMistakeCountAtMost !== undefined) {
-    if (totalMistakes > condition.requiredMistakeCountAtMost) return false;
+    if (minPlaythroughMistakes > condition.requiredMistakeCountAtMost) return false;
   }
 
   if (condition.requiredMistakeCountAtLeast) {
-    if (totalMistakes < condition.requiredMistakeCountAtLeast) return false;
+    if (totalAccumulatedMistakes < condition.requiredMistakeCountAtLeast) return false;
   }
 
   if (condition.requiredTrustLevel) {

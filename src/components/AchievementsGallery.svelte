@@ -71,8 +71,8 @@
     selectedArchive = archive;
   }
 
-  function handlePlayAudio(audio: SpecialAudio) {
-    if (!audio.isUnlocked) return;
+  function handlePlayAudio(audio: SpecialAudio | null) {
+    if (!audio || !audio.isUnlocked) return;
     playSFX('select');
     if (audio.sfxType) {
       playSFX(audio.sfxType, 0.8);
