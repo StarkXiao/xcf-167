@@ -49,6 +49,7 @@ import {
   finalizeRewind,
   initiateRewind
 } from './timeRewind';
+import { checkAndUnlockAchievements, recordChoice, recordMisjudgment } from './achievements';
 
 
 
@@ -269,6 +270,10 @@ function recordPlaythroughCompletion(endingId: string): void {
     nodesVisited: state.visitedNodes,
     choicesMade: []
   });
+  checkAndUnlockAchievements({
+    endingUnlocked: endingId,
+    playthroughComplete: true
+  });
 }
 
 function getEvidenceStateIds(): string[] {
@@ -358,6 +363,10 @@ export function selectChoice(choiceId: string): void {
 
   processChoiceMemoryEffect(choice);
   applyChoiceWeightModifier(node.id, choiceId);
+  recordChoice(choiceId);
+  checkAndUnlockAchievements({
+    choiceMade: choiceId
+  });
   
   goToNode(choice.nextNodeId);
 }

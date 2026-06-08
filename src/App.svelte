@@ -4,6 +4,7 @@
   import GameScene from './components/GameScene.svelte';
   import EndingsGallery from './components/EndingsGallery.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
+  import AchievementsGallery from './components/AchievementsGallery.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
@@ -14,6 +15,7 @@
   let scene: GameSceneType = 'menu';
   let showSettings = false;
   let showEndings = false;
+  let showAchievements = false;
 
   function handleNewGame() {
     resetGameState();
@@ -43,6 +45,10 @@
     showSettings = true;
   }
 
+  function handleShowAchievements() {
+    showAchievements = true;
+  }
+
   function handleBackToMenu() {
     stopBGM();
     scene = 'menu';
@@ -54,6 +60,10 @@
 
   function handleCloseSettings() {
     showSettings = false;
+  }
+
+  function handleCloseAchievements() {
+    showAchievements = false;
   }
 
   onMount(() => {
@@ -68,6 +78,7 @@
       onContinue={handleContinue}
       onShowEndings={handleShowEndings}
       onShowSettings={handleShowSettings}
+      onShowAchievements={handleShowAchievements}
     />
   {:else if scene === 'playing'}
     <GameScene onBackToMenu={handleBackToMenu} onShowEndingsGallery={handleShowEndings} />
@@ -75,6 +86,7 @@
 
   <EndingsGallery isOpen={showEndings} onClose={handleCloseEndings} />
   <SettingsPanel isOpen={showSettings} onClose={handleCloseSettings} />
+  <AchievementsGallery isOpen={showAchievements} onClose={handleCloseAchievements} />
 </div>
 
 <style>

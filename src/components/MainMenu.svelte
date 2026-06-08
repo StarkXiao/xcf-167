@@ -5,11 +5,13 @@
   import { getMemorySummaryForMenu, hasAnyMemory, currentPlaythrough } from '../lib/memory';
   import { getAllEndings } from '../lib/engine';
   import { buildAnonymousSummary } from '../lib/anonymousSender';
+  import { currentSkin, achievementProgress } from '../lib/achievements';
 
   export let onNewGame: () => void;
   export let onContinue: (slot: SaveSlot) => void;
   export let onShowEndings: () => void;
   export let onShowSettings: () => void;
+  export let onShowAchievements: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -58,6 +60,11 @@
     onShowSettings();
   }
 
+  function handleAchievements() {
+    playSFX('click');
+    onShowAchievements();
+  }
+
   function backToMenu() {
     playSFX('click');
     showLoadMenu = false;
@@ -70,7 +77,8 @@
   }
 </script>
 
-<div class="menu-container">
+<div class="menu-container" 
+     style="background: {$currentSkin.gradient}; --accent-color: {$currentSkin.accentColor}; --title-color: {$currentSkin.titleColor}; --subtitle-color: {$currentSkin.subtitleColor}; --btn-bg: {$currentSkin.buttonBg}; --btn-border: {$currentSkin.buttonBorder}; --particle-color: {$currentSkin.particleColor}; --decoration: {$currentSkin.bgDecoration};">
   <div class="bubble-bg">
     {#each Array.from({ length: 15 }) as _, i}
       <div class="bubble" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 8}s; animation-duration: {8 + Math.random() * 6}s;"></div>
@@ -136,6 +144,16 @@
           </span>
         </button>
 
+        <button class="menu-btn" on:click={handleAchievements}>
+          <span class="btn-icon">🏆</span>
+          <span class="btn-text">
+            成就与档案
+            {#if $achievementProgress.unlocked > 0}
+              <span class="menu-badge">{$achievementProgress.unlocked}/{$achievementProgress.total}</span>
+            {/if}
+          </span>
+        </button>
+
         <button class="menu-btn" on:click={handleSettings}>
           <span class="btn-icon">⚙</span>
           <span class="btn-text">设置</span>
@@ -189,8 +207,8 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    background: linear-gradient(180deg, #0a0f1a 0%, #001830 50%, #000a14 100%);
     overflow: hidden;
+    transition: background 0.5s ease;
   }
 
   .bubble-bg {
@@ -205,7 +223,7 @@
     bottom: -50px;
     width: 8px;
     height: 8px;
-    background: radial-gradient(circle at 30% 30%, rgba(100, 180, 255, 0.4), rgba(50, 100, 200, 0.1));
+    background: var(--particle-color);
     border-radius: 50%;
     animation: bubble 10s infinite ease-in;
   }
@@ -226,17 +244,19 @@
   .game-title {
     font-size: clamp(2rem, 8vw, 3rem);
     font-weight: 700;
-    color: #64b4ff;
-    text-shadow: 0 0 30px rgba(100, 180, 255, 0.5), 0 0 60px rgba(100, 180, 255, 0.3);
+    color: var(--title-color);
+    text-shadow: 0 0 30px color-mix(in srgb, var(--title-color) 50%, transparent), 0 0 60px color-mix(in srgb, var(--title-color) 30%, transparent);
     letter-spacing: 0.1em;
     margin-bottom: 8px;
+    transition: color 0.5s ease, text-shadow 0.5s ease;
   }
 
   .subtitle {
     font-size: clamp(0.7rem, 2.5vw, 0.9rem);
-    color: #4a7a9a;
+    color: var(--subtitle-color);
     letter-spacing: 0.3em;
     margin-bottom: 16px;
+    transition: color 0.5s ease;
   }
 
   .timestamp {
@@ -250,10 +270,11 @@
   .memory-summary {
     margin-top: 20px;
     padding: 14px 18px;
-    background: rgba(30, 50, 80, 0.4);
-    border: 1px solid rgba(255, 200, 100, 0.25);
+    background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+    border: 1px solid color-mix(in srgb, #ffd890 25%, transparent);
     border-radius: 8px;
     backdrop-filter: blur(8px);
+    transition: all 0.5s ease;
   }
 
   .memory-row {
@@ -322,10 +343,11 @@
   .menu-badge {
     margin-left: 8px;
     padding: 2px 8px;
-    background: rgba(100, 180, 255, 0.2);
+    background: color-mix(in srgb, var(--accent-color) 20%, transparent);
     border-radius: 10px;
     font-size: 0.75rem;
     color: #8ab0d0;
+    transition: all 0.5s ease;
   }
 
   .menu-buttons {
@@ -341,8 +363,8 @@
     justify-content: center;
     gap: 12px;
     padding: 16px 24px;
-    background: rgba(20, 40, 70, 0.6);
-    border: 1px solid rgba(100, 180, 255, 0.3);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
     border-radius: 8px;
     color: #c0d8f0;
     font-size: 1rem;
@@ -352,14 +374,14 @@
   }
 
   .menu-btn:hover, .menu-btn:active {
-    background: rgba(40, 80, 140, 0.8);
-    border-color: rgba(100, 180, 255, 0.6);
+    background: color-mix(in srgb, var(--accent-color) 35%, transparent);
+    border-color: color-mix(in srgb, var(--accent-color) 60%, transparent);
     transform: translateY(-1px);
   }
 
   .menu-btn.primary {
-    background: linear-gradient(135deg, rgba(60, 120, 200, 0.8), rgba(40, 80, 160, 0.8));
-    border-color: #64b4ff;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent-color) 50%, transparent), color-mix(in srgb, var(--accent-color) 35%, transparent));
+    border-color: var(--accent-color);
   }
 
   .btn-icon {
@@ -385,10 +407,11 @@
   }
 
   .load-title {
-    color: #64b4ff;
+    color: var(--accent-color);
     text-align: center;
     margin-bottom: 24px;
     font-size: 1.4rem;
+    transition: color 0.5s ease;
   }
 
   .slot-list {
@@ -401,16 +424,16 @@
   .slot-item {
     text-align: left;
     padding: 16px;
-    background: rgba(20, 40, 70, 0.6);
-    border: 1px solid rgba(100, 180, 255, 0.2);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
   }
 
   .slot-item:hover, .slot-item:active {
-    background: rgba(40, 80, 140, 0.8);
-    border-color: rgba(100, 180, 255, 0.5);
+    background: color-mix(in srgb, var(--accent-color) 35%, transparent);
+    border-color: color-mix(in srgb, var(--accent-color) 50%, transparent);
   }
 
   .slot-info {
@@ -420,8 +443,9 @@
   }
 
   .slot-id {
-    color: #64b4ff;
+    color: var(--accent-color);
     font-weight: 600;
+    transition: color 0.5s ease;
   }
 
   .slot-time {
@@ -440,9 +464,10 @@
     gap: 8px;
     margin-top: 6px;
     padding: 6px 10px;
-    background: rgba(20, 40, 70, 0.4);
-    border: 1px solid rgba(100, 180, 255, 0.2);
+    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
     border-radius: 6px;
+    transition: all 0.5s ease;
   }
 
   .slot-latest-message .latest-icon {
@@ -494,14 +519,15 @@
     margin: 0 auto;
     padding: 12px 24px;
     background: transparent;
-    border: 1px solid rgba(100, 180, 255, 0.3);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
     border-radius: 8px;
     color: #8ab0d0;
     cursor: pointer;
     font-size: 0.9rem;
+    transition: all 0.2s;
   }
 
   .back-btn:hover {
-    background: rgba(100, 180, 255, 0.1);
+    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
   }
 </style>

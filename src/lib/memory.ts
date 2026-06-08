@@ -7,6 +7,7 @@ import type {
   DialogueVariant,
   AudioHint
 } from '../types/game';
+import { checkAndUnlockAchievements } from './achievements';
 
 const MEMORY_KEY = 'deep_sea_global_memory';
 
@@ -136,6 +137,9 @@ export function unlockClue(
     unlockedClues: { ...m.unlockedClues, [clueId]: clue },
     updatedAt: Date.now()
   }));
+  checkAndUnlockAchievements({
+    clueUnlocked: clueId
+  });
   return true;
 }
 
@@ -153,6 +157,9 @@ export function unlockEvidenceId(evidenceId: string): boolean {
     unlockedEvidenceIds: [...m.unlockedEvidenceIds, evidenceId],
     updatedAt: Date.now()
   }));
+  checkAndUnlockAchievements({
+    evidenceCollected: evidenceId
+  });
   return true;
 }
 

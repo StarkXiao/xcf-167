@@ -429,4 +429,92 @@ export interface AnonymousSenderState {
   viewingTerminalId: string | null;
 }
 
+export type AchievementCategory = 'story' | 'clue' | 'ending' | 'trust' | 'evidence' | 'secret' | 'special';
+
+export interface AchievementCondition {
+  requiredEndings?: string[];
+  requiredClues?: string[];
+  requiredChoices?: string[];
+  requiredPaths?: string[];
+  requiredPlaythroughAtLeast?: number;
+  requiredMistakeCountAtMost?: number;
+  requiredMistakeCountAtLeast?: number;
+  requiredClueCountAtLeast?: number;
+  requiredEvidenceCountAtLeast?: number;
+  requiredAllEndings?: boolean;
+  anyEndings?: string[];
+  requiredTrustLevel?: {
+    memberId: CrewMemberId;
+    minLevel?: TrustLevel;
+  }[];
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: AchievementCategory;
+  isSecret: boolean;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  condition: AchievementCondition;
+  unlockHint?: string;
+  reward?: {
+    archiveId?: string;
+    audioId?: string;
+    skinId?: string;
+  };
+}
+
+export interface ArchiveEntry {
+  id: string;
+  title: string;
+  content: string;
+  category: 'character' | 'document' | 'audio_log' | 'secret' | 'development';
+  unlockedAt?: number;
+  isUnlocked: boolean;
+}
+
+export interface SpecialAudio {
+  id: string;
+  title: string;
+  description: string;
+  sfxType?: SFXType;
+  customPattern?: {
+    type: 'tone' | 'noise' | 'sequence';
+    freqs?: number[];
+    duration?: number;
+  };
+  isUnlocked: boolean;
+}
+
+export interface MenuSkin {
+  id: string;
+  name: string;
+  description: string;
+  gradient: string;
+  accentColor: string;
+  titleColor: string;
+  subtitleColor: string;
+  buttonBg: string;
+  buttonBorder: string;
+  bgDecoration: string;
+  particleColor: string;
+  isUnlocked: boolean;
+}
+
+export interface AchievementState {
+  unlockedAchievements: Record<string, {
+    unlockedAt: number;
+    playthrough: number;
+  }>;
+  unlockedArchives: string[];
+  unlockedAudios: string[];
+  unlockedSkins: string[];
+  currentSkin: string;
+  mistakeCountTotal: number;
+  totalPlaythroughs: number;
+  choicesMadeThisPlaythrough?: string[];
+}
+
 

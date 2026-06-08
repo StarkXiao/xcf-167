@@ -16,6 +16,7 @@ import {
 } from '../data/evidence';
 import { setVariable } from './store';
 import { applyTrustEffect } from './trust';
+import { checkAndUnlockAchievements, recordMisjudgment } from './achievements';
 
 function createInitialEndingWeights(): EndingWeight[] {
   return Object.entries(baseEndingWeights).map(([endingId, baseWeight]) => ({
@@ -255,11 +256,18 @@ export function attemptDeduction(ruleId: string): { success: boolean; feedback: 
     if (rule.outcome.trustEffect) {
       applyTrustEffect(rule.outcome.trustEffect);
     }
+    checkAndUnlockAchievements({
+      deductionCompleted: ruleId
+    });
     return { success: true, feedback: rule.outcome.feedback };
   } else {
+    recordMisjudgment();
     if (rule.outcome.wrongTrustEffect) {
       applyTrustEffect(rule.outcome.wrongTrustEffect);
     }
+    checkAndUnlockAchievements({
+      misjudgmentMade: true
+    });
     return {
       success: false,
       feedback: '这个推理组合似乎不太对...再想想证据之间的关联。'
