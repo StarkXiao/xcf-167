@@ -288,6 +288,34 @@ export function getAnonymousSenderPersistentState():
   };
 }
 
+export interface AnonymousSummary {
+  emailCount: number;
+  terminalCount: number;
+  unreadCount: number;
+  latestPreview: string;
+}
+
+export function buildAnonymousSummary(
+  state: Omit<AnonymousSenderState, 'activeNotification' | 'isMailboxOpen' | 'isTerminalOpen' | 'viewingEmailId' | 'viewingTerminalId'> | undefined
+): AnonymousSummary {
+  if (!state) {
+    return { emailCount: 0, terminalCount: 0, unreadCount: 0, latestPreview: '' };
+  }
+  const emailCount = state.emails?.length || 0;
+  const terminalCount = state.terminalRecords?.length || 0;
+  const unreadCount = (state.unreadEmailCount || 0) + (state.unreadTerminalCount || 0);
+  const all: Array<{ type: AnonymousMessageType; subject: string; timestamp: number }> = [];
+  (state.emails || []).forEach(e => all.push({ type: 'email', subject: e.subject, timestamp: e.timestamp }));
+  (state.terminalRecords || []).forEach(t => all.push({ type: 'terminal', subject: t.title, timestamp: t.timestamp }));
+  let latestPreview = '';
+  if (all.length > 0) {
+    all.sort((a, b) => b.timestamp - a.timestamp);
+    const latest = all[0];
+    latestPreview = `${latest.type === 'email' ? '📧' : '💻'} ${latest.subject}`;
+  }
+  return { emailCount, terminalCount, unreadCount, latestPreview };
+}
+
 export function restoreAnonymousSenderState(
   persisted: Omit<AnonymousSenderState, 'activeNotification' | 'isMailboxOpen' | 'isTerminalOpen' | 'viewingEmailId' | 'viewingTerminalId'> | undefined
 ): void {

@@ -3,6 +3,7 @@
   import type { SaveSlot, GameState } from '../types/game';
   import { saveToSlot, deleteSlot, loadSaveSlots } from '../lib/storage';
   import { gameState } from '../lib/store';
+  import { buildAnonymousSummary } from '../lib/anonymousSender';
   import { get } from 'svelte/store';
 
   export let isOpen: boolean;
@@ -31,13 +32,12 @@
 
   function buildPreview(state: GameState): string {
     const parts: string[] = [`节点: ${state.currentNodeId}`];
-    if (state.anonymousSenderState) {
-      const as = state.anonymousSenderState;
-      const emailCount = as.emails.length;
-      const terminalCount = as.terminalRecords.length;
-      const unreadTotal = as.unreadEmailCount + as.unreadTerminalCount;
-      if (emailCount > 0 || terminalCount > 0) {
-        parts.push(`📧${emailCount} 💻${terminalCount}${unreadTotal > 0 ? ` ⚠${unreadTotal}` : ''}`);
+    const anon = buildAnonymousSummary(state.anonymousSenderState);
+    if (anon.emailCount > 0 || anon.terminalCount > 0) {
+      const counter = `📧${anon.emailCount} 💻${anon.terminalCount}${anon.unreadCount > 0 ? ` ⚠${anon.unreadCount}` : ''}`;
+      parts.push(counter);
+      if (anon.latestPreview) {
+        parts.push(anon.latestPreview);
       }
     }
     return parts.join(' · ');

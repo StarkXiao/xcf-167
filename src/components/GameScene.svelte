@@ -75,7 +75,8 @@
     unreadTerminalCount,
     getAnonymousSenderPersistentState,
     restoreAnonymousSenderState,
-    clearPendingTriggers
+    clearPendingTriggers,
+    latestMessagePreview
   } from '../lib/anonymousSender';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
   import { getNode, rewindToCheckpoint } from '../lib/engine';
@@ -96,6 +97,15 @@
   let rewindMessage = '';
   let showRewindMessage = false;
   let lastVariableKeys = '';
+  let lastAnonymousSignature = '';
+
+  function buildAnonymousSignature(): string {
+    const s = get(anonymousSenderState);
+    const emailSig = s.emails.map(e => `${e.id}:${e.isRead ? '1' : '0'}`).join('|');
+    const termSig = s.terminalRecords.map(t => `${t.id}:${t.isRead ? '1' : '0'}`).join('|');
+    const trigSig = s.triggeredIds.join(',');
+    return `${emailSig}__${termSig}__${trigSig}__${s.unreadEmailCount}_${s.unreadTerminalCount}`;
+  }
 
   function syncEvidenceToMemory(nodeId: string) {
     const state = get(evidenceBoard);
@@ -362,11 +372,15 @@
     lastVariableKeys = '';
     showRewindPanel = false;
     updateState();
+    lastAnonymousSignature = buildAnonymousSignature();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
   }
 
-  function persistAnonymousSenderToGameState() {
+  function persistAnonymousSenderToGameState(force = false) {
+    const signature = buildAnonymousSignature();
+    if (!force && signature === lastAnonymousSignature) return;
+    lastAnonymousSignature = signature;
     gameState.update(state => ({
       ...state,
       anonymousSenderState: getAnonymousSenderPersistentState(),
@@ -439,6 +453,7 @@
       resetAnonymousSenderState();
     }
     lastVariableKeys = Object.keys(initialState.variables).sort().join(',');
+    lastAnonymousSignature = buildAnonymousSignature();
     updateState();
     playBGM('deep');
     triggerDanmakusForDialogue(get(gameState).dialogueIndex);
@@ -457,12 +472,9 @@
     if (!isEnding && !showGameMenu) {
       updateState();
     }
-    persistAnonymousSenderToGameState();
   }
 
-  $: if ($unreadEmailCount + $unreadTerminalCount > 0) {
-    persistAnonymousSenderToGameState();
-  }
+  $: $anonymousSenderState, persistAnonymousSenderToGameState();
 </script>
 
 <div class="game-scene" on:click={handleGameAreaClick}>

@@ -4,6 +4,7 @@
   import type { SaveSlot } from '../types/game';
   import { getMemorySummaryForMenu, hasAnyMemory, currentPlaythrough } from '../lib/memory';
   import { getAllEndings } from '../lib/engine';
+  import { buildAnonymousSummary } from '../lib/anonymousSender';
 
   export let onNewGame: () => void;
   export let onContinue: (slot: SaveSlot) => void;
@@ -21,6 +22,10 @@
 
   function loadSlots() {
     saveSlots = loadSaveSlots();
+  }
+
+  function getSlotLatestMessage(slot: SaveSlot): string {
+    return buildAnonymousSummary(slot.state.anonymousSenderState).latestPreview;
   }
 
   function handleNewGame() {
@@ -155,6 +160,12 @@
                 <span class="slot-time">{new Date(slot.savedAt).toLocaleString('zh-CN')}</span>
               </div>
               <p class="slot-preview">{slot.preview}</p>
+              {#if getSlotLatestMessage(slot)}
+                <div class="slot-latest-message">
+                  <span class="latest-icon">{getSlotLatestMessage(slot).startsWith('📧') ? '📧' : '💻'}</span>
+                  <span class="latest-text">{getSlotLatestMessage(slot).slice(2).trim()}</span>
+                </div>
+              {/if}
               {#if slot.state.anonymousSenderState && (slot.state.anonymousSenderState.unreadEmailCount + slot.state.anonymousSenderState.unreadTerminalCount) > 0}
                 <div class="slot-anon-hint">
                   <span class="anon-hint-dot"></span>
@@ -421,6 +432,30 @@
   .slot-preview {
     color: #a0b8d0;
     font-size: 0.85rem;
+  }
+
+  .slot-latest-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: rgba(20, 40, 70, 0.4);
+    border: 1px solid rgba(100, 180, 255, 0.2);
+    border-radius: 6px;
+  }
+
+  .slot-latest-message .latest-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .slot-latest-message .latest-text {
+    color: #a0c8e8;
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .slot-anon-hint {
