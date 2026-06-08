@@ -22,7 +22,8 @@ import {
   removeDanmaku,
   clearDanmakus,
   resetGameState,
-  isTyping
+  isTyping,
+  settings
 } from './store';
 import { get } from 'svelte/store';
 import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier, evidenceBoard } from './evidence';
@@ -34,7 +35,8 @@ import {
   markDialogueVariantUsed,
   unlockClue,
   recordPlaythrough,
-  isClueUnlocked
+  isClueUnlocked,
+  globalMemory
 } from './memory';
 import { playSFX, playSFXWithRewind } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
@@ -510,6 +512,12 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
   const totalTypingDuration = calculateTotalTypingDuration(fullText, charDelay);
   const corruptionLevel = getCurrentCorruption();
   const rewindEffect = getActiveRewindEffect();
+  const memory = get(globalMemory);
+  const currentPlaythrough = memory.currentPlaythrough;
+  const gameSettings = get(settings);
+  const pseudoLiveEnabled = gameSettings.pseudoLiveMode;
+  const hideImportantFirst = gameSettings.hideImportantDanmakuFirstPlay;
+  const showBackstage = gameSettings.showBackstageView;
   
   let relevantDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== undefined) {
@@ -517,6 +525,21 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
     }
     const baseTime = dialogueIndex * 10000;
     return d.timestamp >= baseTime && d.timestamp < baseTime + 10000;
+  });
+
+  relevantDanmakus = relevantDanmakus.filter(d => {
+    if (pseudoLiveEnabled && hideImportantFirst && currentPlaythrough === 1 && d.isImportant) {
+      return false;
+    }
+    if (d.isBackstageOnly) {
+      if (!pseudoLiveEnabled || !showBackstage) return false;
+      if (d.playthroughRequired && currentPlaythrough < d.playthroughRequired) return false;
+      if (!d.playthroughRequired && currentPlaythrough < 2) return false;
+    }
+    if (d.playthroughRequired && !d.isBackstageOnly) {
+      if (currentPlaythrough < d.playthroughRequired) return false;
+    }
+    return true;
   });
   
   if (rewindEffect?.danmakuReorderSeed !== undefined) {
@@ -578,11 +601,32 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
   const elapsedMs = calculateCharTime(dialogue.text, charIndex, charDelay);
   const tolerance = charDelay * 3;
   const corruptionLevel = getCurrentCorruption();
+  const memory = get(globalMemory);
+  const currentPlaythrough = memory.currentPlaythrough;
+  const gameSettings = get(settings);
+  const pseudoLiveEnabled = gameSettings.pseudoLiveMode;
+  const hideImportantFirst = gameSettings.hideImportantDanmakuFirstPlay;
+  const showBackstage = gameSettings.showBackstageView;
   
-  const dueDanmakus = node.danmakus.filter(d => {
+  let dueDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== dialogueIndex) return false;
     const targetMs = d.relativeMs !== undefined ? d.relativeMs : (d.timestamp % 10000);
     return Math.abs(targetMs - elapsedMs) <= tolerance;
+  });
+
+  dueDanmakus = dueDanmakus.filter(d => {
+    if (pseudoLiveEnabled && hideImportantFirst && currentPlaythrough === 1 && d.isImportant) {
+      return false;
+    }
+    if (d.isBackstageOnly) {
+      if (!pseudoLiveEnabled || !showBackstage) return false;
+      if (d.playthroughRequired && currentPlaythrough < d.playthroughRequired) return false;
+      if (!d.playthroughRequired && currentPlaythrough < 2) return false;
+    }
+    if (d.playthroughRequired && !d.isBackstageOnly) {
+      if (currentPlaythrough < d.playthroughRequired) return false;
+    }
+    return true;
   });
   
   dueDanmakus.forEach(danmaku => {

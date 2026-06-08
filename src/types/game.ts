@@ -7,6 +7,8 @@ export interface Danmaku {
   relativeMs?: number;
   color?: string;
   isImportant?: boolean;
+  isBackstageOnly?: boolean;
+  playthroughRequired?: number;
 }
 
 export interface Choice {

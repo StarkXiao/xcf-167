@@ -44,6 +44,26 @@
     localSettings.danmakuSpeed = Number(target.value);
   }
 
+  function handlePseudoLiveToggle() {
+    localSettings.pseudoLiveMode = !localSettings.pseudoLiveMode;
+    playSFX('click');
+  }
+
+  function handleHideImportantToggle() {
+    localSettings.hideImportantDanmakuFirstPlay = !localSettings.hideImportantDanmakuFirstPlay;
+    playSFX('click');
+  }
+
+  function handleBackstageViewToggle() {
+    localSettings.showBackstageView = !localSettings.showBackstageView;
+    playSFX('click');
+  }
+
+  function handleSubtitleRhythmToggle() {
+    localSettings.subtitleRhythmAdjust = !localSettings.subtitleRhythmAdjust;
+    playSFX('click');
+  }
+
   function handleSave() {
     playSFX('select');
     saveSettings(localSettings);
@@ -137,6 +157,65 @@
             <span class="range-label">快</span>
           </div>
         </div>
+
+        <div class="settings-divider">
+          <span class="divider-text">伪直播模式</span>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label">启用伪直播模式</label>
+          <div class="setting-control">
+            <button 
+              class="toggle-btn"
+              class:active={localSettings.pseudoLiveMode}
+              on:click={handlePseudoLiveToggle}
+            >
+              {localSettings.pseudoLiveMode ? '开启' : '关闭'}
+            </button>
+          </div>
+          <span class="setting-hint">首周目隐藏关键弹幕，二周目开放后台视角</span>
+        </div>
+
+        {#if localSettings.pseudoLiveMode}
+          <div class="setting-item">
+            <label class="setting-label">首周目隐藏关键弹幕</label>
+            <div class="setting-control">
+              <button 
+                class="toggle-btn"
+                class:active={localSettings.hideImportantDanmakuFirstPlay}
+                on:click={handleHideImportantToggle}
+              >
+                {localSettings.hideImportantDanmakuFirstPlay ? '开启' : '关闭'}
+              </button>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">二周目开放后台视角</label>
+            <div class="setting-control">
+              <button 
+                class="toggle-btn"
+                class:active={localSettings.showBackstageView}
+                on:click={handleBackstageViewToggle}
+              >
+                {localSettings.showBackstageView ? '开启' : '关闭'}
+              </button>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">字幕节奏联动周目</label>
+            <div class="setting-control">
+              <button 
+                class="toggle-btn"
+                class:active={localSettings.subtitleRhythmAdjust}
+                on:click={handleSubtitleRhythmToggle}
+              >
+                {localSettings.subtitleRhythmAdjust ? '开启' : '关闭'}
+              </button>
+            </div>
+          </div>
+        {/if}
       </div>
 
       <div class="button-row">
@@ -201,6 +280,39 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .settings-divider {
+    position: relative;
+    text-align: center;
+    margin: 8px 0 4px;
+  }
+
+  .settings-divider::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100, 180, 255, 0.3), transparent);
+  }
+
+  .divider-text {
+    position: relative;
+    padding: 0 12px;
+    background: transparent;
+    color: #64b4ff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .setting-hint {
+    font-size: 0.7rem;
+    color: #6a8aaa;
+    margin-top: 2px;
+    font-style: italic;
   }
 
   .setting-label {
