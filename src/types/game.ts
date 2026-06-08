@@ -247,6 +247,8 @@ export interface PlaythroughRecord {
   evidenceCollected: string[];
   nodesVisited: string[];
   choicesMade: { nodeId: string; choiceId: string }[];
+  mistakeCount: number;
+  pathTaken?: string;
 }
 
 export interface GlobalMemory {
@@ -513,8 +515,10 @@ export interface AchievementState {
   unlockedSkins: string[];
   currentSkin: string;
   mistakeCountTotal: number;
+  mistakeCountThisPlaythrough: number;
   totalPlaythroughs: number;
-  choicesMadeThisPlaythrough?: string[];
+  choicesMadeThisPlaythrough: { nodeId: string; choiceId: string }[];
+  currentPath?: string;
 }
 
 

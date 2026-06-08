@@ -49,7 +49,7 @@ import {
   finalizeRewind,
   initiateRewind
 } from './timeRewind';
-import { checkAndUnlockAchievements, recordChoice, recordMisjudgment } from './achievements';
+import { checkAndUnlockAchievements, recordChoice, recordMisjudgment, getPlaythroughDataForRecord, resetPlaythroughTracking, setCurrentPath } from './achievements';
 
 
 
@@ -263,13 +263,18 @@ export function advance(): void {
 function recordPlaythroughCompletion(endingId: string): void {
   const state = get(gameState);
   const evidenceState = getEvidenceStateIds();
+  const playthroughData = getPlaythroughDataForRecord();
+  const pathFromVars = state.variables.path as string | undefined;
   recordPlaythrough({
     endingId,
     cluesUnlocked: Object.keys(state.variables).filter(k => k.startsWith('clue') || k.startsWith('full_truth') || k.startsWith('creature') || k.startsWith('crew') || k.startsWith('previous') || k.startsWith('signal')),
     evidenceCollected: evidenceState,
     nodesVisited: state.visitedNodes,
-    choicesMade: []
+    choicesMade: playthroughData.choicesMade,
+    mistakeCount: playthroughData.mistakeCount,
+    pathTaken: playthroughData.pathTaken || pathFromVars
   });
+  resetPlaythroughTracking();
   checkAndUnlockAchievements({
     endingUnlocked: endingId,
     playthroughComplete: true
@@ -363,7 +368,16 @@ export function selectChoice(choiceId: string): void {
 
   processChoiceMemoryEffect(choice);
   applyChoiceWeightModifier(node.id, choiceId);
-  recordChoice(choiceId);
+  recordChoice(node.id, choiceId);
+  
+  if (choiceId === 'c_keep_live' || choiceId === 'c_keep_live_2') {
+    setCurrentPath('live');
+  } else if (choiceId === 'c_stop_live') {
+    setCurrentPath('stop');
+  } else if (choiceId === 'c_emergency') {
+    setCurrentPath('ascent');
+  }
+  
   checkAndUnlockAchievements({
     choiceMade: choiceId
   });

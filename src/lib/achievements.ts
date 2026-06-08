@@ -25,7 +25,10 @@ function createInitialAchievementState(): AchievementState {
     unlockedSkins: ['skin_default'],
     currentSkin: 'skin_default',
     mistakeCountTotal: 0,
-    totalPlaythroughs: 0
+    mistakeCountThisPlaythrough: 0,
+    totalPlaythroughs: 0,
+    choicesMadeThisPlaythrough: [],
+    currentPath: undefined
   };
 }
 
@@ -124,6 +127,20 @@ function checkTrustLevel(memberId: CrewMemberId, minLevel: TrustLevel): boolean 
 
 function checkAchievementCondition(condition: AchievementCondition): boolean {
   const memory = get(globalMemory);
+  const achState = get(achievementState);
+  const gState = get(gameState);
+
+  const allHistoryChoices = memory.playthroughHistory.flatMap(p => p.choicesMade || []);
+  const currentAndHistoryChoices = [...allHistoryChoices, ...achState.choicesMadeThisPlaythrough];
+
+  const allHistoryPaths = memory.playthroughHistory.map(p => p.pathTaken).filter(Boolean) as string[];
+  const currentAndHistoryPaths = [...allHistoryPaths];
+  if (achState.currentPath) currentAndHistoryPaths.push(achState.currentPath);
+  const gameVarPath = gState.variables.path as string | undefined;
+  if (gameVarPath && !currentAndHistoryPaths.includes(gameVarPath)) currentAndHistoryPaths.push(gameVarPath);
+
+  const allHistoryMistakes = memory.playthroughHistory.reduce((sum, p) => sum + (p.mistakeCount || 0), 0);
+  const totalMistakes = allHistoryMistakes + achState.mistakeCountThisPlaythrough + achState.mistakeCountTotal;
 
   if (condition.requiredPlaythroughAtLeast) {
     if (memory.currentPlaythrough < condition.requiredPlaythroughAtLeast) return false;
@@ -172,13 +189,11 @@ function checkAchievementCondition(condition: AchievementCondition): boolean {
   }
 
   if (condition.requiredMistakeCountAtMost !== undefined) {
-    const state = get(achievementState);
-    if (state.mistakeCountTotal > condition.requiredMistakeCountAtMost) return false;
+    if (totalMistakes > condition.requiredMistakeCountAtMost) return false;
   }
 
   if (condition.requiredMistakeCountAtLeast) {
-    const state = get(achievementState);
-    if (state.mistakeCountTotal < condition.requiredMistakeCountAtLeast) return false;
+    if (totalMistakes < condition.requiredMistakeCountAtLeast) return false;
   }
 
   if (condition.requiredTrustLevel) {
@@ -188,29 +203,22 @@ function checkAchievementCondition(condition: AchievementCondition): boolean {
   }
 
   if (condition.requiredPaths) {
-    const gState = get(gameState);
-    const currentPath = gState.variables.path as string | undefined;
-    if (currentPath && condition.requiredPaths.includes(currentPath)) {
-      return true;
-    }
-    const allPlaythroughChoices = memory.playthroughHistory.flatMap(p => p.choicesMade || []);
-    const hasPath = condition.requiredPaths.some(pathId =>
-      allPlaythroughChoices.some(c => c.choiceId.includes(pathId))
-    );
+    const hasPath = condition.requiredPaths.some(pathId => currentAndHistoryPaths.includes(pathId));
     if (!hasPath) {
       const visitedNodes = memory.playthroughHistory.flatMap(p => p.nodesVisited || []);
+      const gVisited = gState.visitedNodes || [];
+      const allVisited = [...visitedNodes, ...gVisited];
       let pathFound = false;
-      if (condition.requiredPaths.includes('live') && visitedNodes.some(n => n.includes('path_live'))) pathFound = true;
-      if (condition.requiredPaths.includes('stop') && visitedNodes.some(n => n.includes('path_stop'))) pathFound = true;
-      if (condition.requiredPaths.includes('ascent') && visitedNodes.some(n => n.includes('path_ascent'))) pathFound = true;
+      if (condition.requiredPaths.includes('live') && allVisited.some(n => n.includes('path_live'))) pathFound = true;
+      if (condition.requiredPaths.includes('stop') && allVisited.some(n => n.includes('path_stop'))) pathFound = true;
+      if (condition.requiredPaths.includes('ascent') && allVisited.some(n => n.includes('path_ascent'))) pathFound = true;
       if (!pathFound) return false;
     }
   }
 
   if (condition.requiredChoices) {
-    const allChoices = memory.playthroughHistory.flatMap(p => p.choicesMade || []);
     const hasChoice = condition.requiredChoices.some(choiceId =>
-      allChoices.some(c => c.choiceId === choiceId)
+      currentAndHistoryChoices.some(c => c.choiceId === choiceId)
     );
     if (!hasChoice) return false;
   }
@@ -300,37 +308,54 @@ export function unlockAchievement(achievementId: string): boolean {
 export function addMistakeCount(): void {
   achievementState.update(s => ({
     ...s,
-    mistakeCountTotal: s.mistakeCountTotal + 1
+    mistakeCountTotal: s.mistakeCountTotal + 1,
+    mistakeCountThisPlaythrough: s.mistakeCountThisPlaythrough + 1
   }));
-  checkAndUnlockAchievements();
 }
 
 export function recordMisjudgment(): void {
   addMistakeCount();
 }
 
+export function recordChoice(nodeId: string, choiceId: string): void {
+  achievementState.update(s => ({
+    ...s,
+    choicesMadeThisPlaythrough: [...s.choicesMadeThisPlaythrough, { nodeId, choiceId }]
+  }));
+}
+
 export function recordChoiceMade(nodeId: string, choiceId: string): void {
-  const memory = get(globalMemory);
-  if (memory.playthroughHistory.length > 0) {
-    const lastIndex = memory.playthroughHistory.length - 1;
-    const lastPlaythrough = memory.playthroughHistory[lastIndex];
-    if (!lastPlaythrough.choicesMade) {
-      lastPlaythrough.choicesMade = [];
-    }
-    lastPlaythrough.choicesMade.push({ nodeId, choiceId });
-  }
+  recordChoice(nodeId, choiceId);
+}
+
+export function setCurrentPath(pathId: string): void {
+  achievementState.update(s => ({
+    ...s,
+    currentPath: pathId
+  }));
   checkAndUnlockAchievements();
 }
 
-export function recordChoice(choiceId: string): void {
-  const memory = get(globalMemory);
+export function getPlaythroughDataForRecord(): {
+  choicesMade: { nodeId: string; choiceId: string }[];
+  mistakeCount: number;
+  pathTaken?: string;
+} {
   const state = get(achievementState);
-  if (!state.choicesMadeThisPlaythrough) {
-    state.choicesMadeThisPlaythrough = [];
-  }
+  return {
+    choicesMade: [...state.choicesMadeThisPlaythrough],
+    mistakeCount: state.mistakeCountThisPlaythrough,
+    pathTaken: state.currentPath
+  };
+}
+
+export function resetPlaythroughTracking(): void {
   achievementState.update(s => ({
     ...s,
-    choicesMadeThisPlaythrough: [...(s.choicesMadeThisPlaythrough || []), choiceId]
+    choicesMadeThisPlaythrough: [],
+    mistakeCountThisPlaythrough: 0,
+    currentPath: undefined,
+    totalPlaythroughs: s.totalPlaythroughs + 1
   }));
 }
 
