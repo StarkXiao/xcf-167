@@ -129,6 +129,7 @@ export interface GameState {
   variables: Record<string, string | number | boolean>;
   unlockedEndings: string[];
   visitedNodes: string[];
+  anonymousSenderState?: Omit<AnonymousSenderState, 'activeNotification' | 'isMailboxOpen' | 'isTerminalOpen' | 'viewingEmailId' | 'viewingTerminalId'>;
   createdAt: number;
   updatedAt: number;
 }
@@ -138,6 +139,9 @@ export interface SaveSlot {
   state: GameState;
   savedAt: number;
   preview: string;
+  unreadEmailCount?: number;
+  unreadTerminalCount?: number;
+  latestMessagePreview?: string;
 }
 
 export type GameScene = 'menu' | 'playing' | 'endings' | 'settings';
@@ -369,6 +373,60 @@ export interface RewindEffect {
   sfxOverride?: { originalSfx: SFXType; replacementSfx: SFXType; delay?: number }[];
   clueAlteration?: { clueId: string; newValue: boolean }[];
   stabilityCost: number;
+}
+
+export type AnonymousMessageType = 'email' | 'terminal';
+
+export interface AnonymousEmail {
+  id: string;
+  subject: string;
+  sender: string;
+  timestamp: number;
+  content: string;
+  isRead: boolean;
+  attachedClue?: string;
+  tags?: string[];
+}
+
+export interface TerminalRecord {
+  id: string;
+  title: string;
+  timestamp: number;
+  content: string;
+  isRead: boolean;
+  command?: string;
+  output?: string;
+  securityLevel?: 'public' | 'restricted' | 'classified';
+  attachedClue?: string;
+}
+
+export interface AnonymousTrigger {
+  id: string;
+  messageType: AnonymousMessageType;
+  messageId: string;
+  triggerNodeId?: string;
+  triggerVariable?: { key: string; value: string | number | boolean };
+  triggerDialogueIndex?: number;
+  memoryCondition?: MemoryCondition;
+  trustCondition?: TrustCondition;
+  delayMs?: number;
+}
+
+export interface AnonymousSenderState {
+  emails: AnonymousEmail[];
+  terminalRecords: TerminalRecord[];
+  triggeredIds: string[];
+  unreadEmailCount: number;
+  unreadTerminalCount: number;
+  activeNotification: {
+    type: AnonymousMessageType;
+    id: string;
+    subject?: string;
+  } | null;
+  isMailboxOpen: boolean;
+  isTerminalOpen: boolean;
+  viewingEmailId: string | null;
+  viewingTerminalId: string | null;
 }
 
 

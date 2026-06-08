@@ -155,6 +155,12 @@
                 <span class="slot-time">{new Date(slot.savedAt).toLocaleString('zh-CN')}</span>
               </div>
               <p class="slot-preview">{slot.preview}</p>
+              {#if slot.state.anonymousSenderState && (slot.state.anonymousSenderState.unreadEmailCount + slot.state.anonymousSenderState.unreadTerminalCount) > 0}
+                <div class="slot-anon-hint">
+                  <span class="anon-hint-dot"></span>
+                  <span>有 {slot.state.anonymousSenderState.unreadEmailCount + slot.state.anonymousSenderState.unreadTerminalCount} 条匿名消息待查看</span>
+                </div>
+              {/if}
             </button>
           {/each}
         {/if}
@@ -415,6 +421,31 @@
   .slot-preview {
     color: #a0b8d0;
     font-size: 0.85rem;
+  }
+
+  .slot-anon-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: rgba(60, 35, 15, 0.4);
+    border: 1px solid rgba(255, 180, 100, 0.25);
+    border-radius: 6px;
+  }
+
+  .anon-hint-dot {
+    width: 8px;
+    height: 8px;
+    background: linear-gradient(135deg, #ffa040, #ff7020);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(255, 150, 80, 0.6);
+    animation: pulse 1.5s infinite;
+  }
+
+  .slot-anon-hint span:last-child {
+    color: #ffc080;
+    font-size: 0.75rem;
   }
 
   .no-save {

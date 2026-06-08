@@ -7,6 +7,7 @@
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
+  import { resetAnonymousSenderState, restoreAnonymousSenderState } from './lib/anonymousSender';
   import type { GameScene as GameSceneType, SaveSlot } from './types/game';
   import { get } from 'svelte/store';
 
@@ -16,6 +17,7 @@
 
   function handleNewGame() {
     resetGameState();
+    resetAnonymousSenderState();
     goToNode('start');
     scene = 'playing';
     setTimeout(() => {
@@ -25,6 +27,7 @@
 
   function handleContinue(slot: SaveSlot) {
     loadState(slot.state);
+    restoreAnonymousSenderState(slot.state.anonymousSenderState);
     scene = 'playing';
     setTimeout(() => {
       const state = get(gameState);

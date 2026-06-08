@@ -21,12 +21,28 @@ const defaultSettings: GameSettings = {
   danmakuSpeed: 1
 };
 
+function createDefaultAnonymousSenderState() {
+  return {
+    emails: [],
+    terminalRecords: [],
+    triggeredIds: [],
+    unreadEmailCount: 0,
+    unreadTerminalCount: 0,
+    activeNotification: null,
+    isMailboxOpen: false,
+    isTerminalOpen: false,
+    viewingEmailId: null,
+    viewingTerminalId: null
+  };
+}
+
 export const defaultGameState: GameState = {
   currentNodeId: 'start',
   dialogueIndex: 0,
   variables: {},
   unlockedEndings: [],
   visitedNodes: [],
+  anonymousSenderState: createDefaultAnonymousSenderState(),
   createdAt: Date.now(),
   updatedAt: Date.now()
 };
@@ -40,6 +56,7 @@ export function createNewGameState(): GameState {
     ...defaultGameState,
     variables: {},
     visitedNodes: [],
+    anonymousSenderState: createDefaultAnonymousSenderState(),
     createdAt: Date.now(),
     updatedAt: Date.now()
   };

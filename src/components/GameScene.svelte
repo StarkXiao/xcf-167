@@ -10,6 +10,9 @@
   import EvidenceBoard from './EvidenceBoard.svelte';
   import TrustPanel from './TrustPanel.svelte';
   import TrustNotifications from './TrustNotifications.svelte';
+  import AnonymousMailbox from './AnonymousMailbox.svelte';
+  import TerminalLog from './TerminalLog.svelte';
+  import AnonymousNotification from './AnonymousNotification.svelte';
   import {
     gameState,
     activeDanmakus,
@@ -62,6 +65,18 @@
     stabilityLevel,
     resetRewindState
   } from '../lib/timeRewind';
+  import {
+    checkAndTriggerMessages,
+    resetAnonymousSenderState,
+    openMailbox,
+    openTerminalLog,
+    anonymousSenderState,
+    unreadEmailCount,
+    unreadTerminalCount,
+    getAnonymousSenderPersistentState,
+    restoreAnonymousSenderState,
+    clearPendingTriggers
+  } from '../lib/anonymousSender';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
   import { getNode, rewindToCheckpoint } from '../lib/engine';
 
@@ -80,6 +95,7 @@
   let lastNodeId = '';
   let rewindMessage = '';
   let showRewindMessage = false;
+  let lastVariableKeys = '';
 
   function syncEvidenceToMemory(nodeId: string) {
     const state = get(evidenceBoard);
@@ -108,6 +124,8 @@
     currentNode = getCurrentNode();
     if (!currentNode) return;
 
+    const state = get(gameState);
+
     if (currentNode.id !== lastNodeId) {
       collectEvidenceByNode(currentNode.id);
       syncEvidenceToMemory(currentNode.id);
@@ -116,11 +134,25 @@
       if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
       }
+      checkAndTriggerMessages({
+        nodeId: currentNode.id,
+        dialogueIndex: state.dialogueIndex,
+        variables: state.variables
+      });
+    }
+
+    const varKeys = Object.keys(state.variables).sort().join(',');
+    if (varKeys !== lastVariableKeys) {
+      lastVariableKeys = varKeys;
+      checkAndTriggerMessages({
+        nodeId: currentNode.id,
+        dialogueIndex: state.dialogueIndex,
+        variables: state.variables
+      });
     }
 
     syncCluesFromVariables();
 
-    const state = get(gameState);
     applyVariableCorruption(state.variables);
 
     if (state.dialogueIndex < currentNode.dialogues.length) {
@@ -270,6 +302,12 @@
         showTrustPanel = false;
       } else if (showRewindPanel) {
         showRewindPanel = false;
+      } else if ($anonymousSenderState.isMailboxOpen) {
+        $anonymousSenderState.isMailboxOpen = false;
+        $anonymousSenderState.viewingEmailId = null;
+      } else if ($anonymousSenderState.isTerminalOpen) {
+        $anonymousSenderState.isTerminalOpen = false;
+        $anonymousSenderState.viewingTerminalId = null;
       } else {
         showGameMenu = !showGameMenu;
       }
@@ -288,8 +326,18 @@
           playSFX('click');
         }
       }
+    } else if (e.key === 'm' || e.key === 'M') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel && !showRewindPanel) {
+        playSFX('select');
+        openMailbox();
+      }
+    } else if (e.key === '`') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel && !showRewindPanel) {
+        playSFX('keyboard');
+        openTerminalLog();
+      }
     } else if (e.key === ' ' || e.key === 'Enter') {
-      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel && !showRewindPanel) {
+      if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel && !showRewindPanel && !$anonymousSenderState.isMailboxOpen && !$anonymousSenderState.isTerminalOpen) {
         e.preventDefault();
         handleDialogueComplete();
       }
@@ -303,6 +351,7 @@
   function handleLoadSlot(slot: SaveSlot) {
     clearDanmakuTimeouts();
     loadState(slot.state);
+    restoreAnonymousSenderState(slot.state.anonymousSenderState);
     resetEvidenceBoard();
     resetCorruption();
     resetTrustState();
@@ -310,15 +359,25 @@
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
+    lastVariableKeys = '';
     showRewindPanel = false;
     updateState();
     const state = get(gameState);
     triggerDanmakusForDialogue(state.dialogueIndex);
   }
 
+  function persistAnonymousSenderToGameState() {
+    gameState.update(state => ({
+      ...state,
+      anonymousSenderState: getAnonymousSenderPersistentState(),
+      updatedAt: Date.now()
+    }));
+  }
+
   function handleRestart() {
     clearDanmakuTimeouts();
     resetGameState();
+    resetAnonymousSenderState();
     resetEvidenceBoard();
     resetCorruption();
     resetTrustState();
@@ -326,6 +385,7 @@
     isEnding = false;
     currentEnding = null;
     lastNodeId = '';
+    lastVariableKeys = '';
     showRewindPanel = false;
     goToNode('start');
     updateState();
@@ -372,6 +432,13 @@
     initSignalCorruption();
     resetEvidenceBoard();
     resetCorruption();
+    const initialState = get(gameState);
+    if (initialState.anonymousSenderState) {
+      restoreAnonymousSenderState(initialState.anonymousSenderState);
+    } else {
+      resetAnonymousSenderState();
+    }
+    lastVariableKeys = Object.keys(initialState.variables).sort().join(',');
     updateState();
     playBGM('deep');
     triggerDanmakusForDialogue(get(gameState).dialogueIndex);
@@ -381,6 +448,7 @@
   onDestroy(() => {
     destroySignalCorruption();
     clearDanmakuTimeouts();
+    clearPendingTriggers();
     stopBGM();
     window.removeEventListener('keydown', handleKeydown);
   });
@@ -389,6 +457,11 @@
     if (!isEnding && !showGameMenu) {
       updateState();
     }
+    persistAnonymousSenderToGameState();
+  }
+
+  $: if ($unreadEmailCount + $unreadTerminalCount > 0) {
+    persistAnonymousSenderToGameState();
   }
 </script>
 
@@ -471,6 +544,24 @@
       </button>
     {/if}
     <button 
+      class="mail-toggle"
+      on:click|stopPropagation={() => { playSFX('select'); openMailbox(); }}
+    >
+      📧
+      {#if $unreadEmailCount > 0}
+        <span class="mail-badge">{$unreadEmailCount}</span>
+      {/if}
+    </button>
+    <button 
+      class="terminal-toggle"
+      on:click|stopPropagation={() => { playSFX('keyboard'); openTerminalLog(); }}
+    >
+      💻
+      {#if $unreadTerminalCount > 0}
+        <span class="terminal-badge">{$unreadTerminalCount}</span>
+      {/if}
+    </button>
+    <button 
       class="trust-toggle"
       on:click|stopPropagation={() => { playSFX('click'); showTrustPanel = true; }}
     >
@@ -506,6 +597,9 @@
 
   <TrustPanel isOpen={showTrustPanel} onClose={() => { showTrustPanel = false; }} />
   <TrustNotifications />
+  <AnonymousMailbox />
+  <TerminalLog />
+  <AnonymousNotification />
 
   {#if showRewindPanel}
     <div class="rewind-panel-backdrop" on:click|stopPropagation={() => { showRewindPanel = false; }}>
@@ -784,12 +878,119 @@
       right: 56px;
       font-size: 1rem;
     }
+
+    .mail-toggle {
+      width: 36px;
+      height: 36px;
+      right: 96px;
+      font-size: 0.9rem;
+    }
+
+    .terminal-toggle {
+      width: 36px;
+      height: 36px;
+      right: 136px;
+      font-size: 0.9rem;
+    }
+
+    .trust-toggle {
+      width: 36px;
+      height: 36px;
+      right: 176px;
+      font-size: 0.9rem;
+    }
+  }
+
+  .mail-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 112px;
+    width: 40px;
+    height: 40px;
+    background: rgba(60, 35, 15, 0.6);
+    border: 1px solid rgba(255, 180, 100, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .mail-toggle:hover, .mail-toggle:active {
+    background: rgba(100, 60, 25, 0.8);
+    border-color: rgba(255, 180, 100, 0.6);
+    box-shadow: 0 0 12px rgba(255, 150, 80, 0.3);
+  }
+
+  .mail-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ffa040, #ff7020);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 6px rgba(255, 150, 80, 0.5);
+  }
+
+  .terminal-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 160px;
+    width: 40px;
+    height: 40px;
+    background: rgba(15, 40, 25, 0.6);
+    border: 1px solid rgba(100, 255, 150, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .terminal-toggle:hover, .terminal-toggle:active {
+    background: rgba(25, 70, 45, 0.8);
+    border-color: rgba(100, 255, 150, 0.6);
+    box-shadow: 0 0 12px rgba(80, 255, 130, 0.3);
+  }
+
+  .terminal-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #40ff80, #20c050);
+    color: #002211;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 6px rgba(80, 255, 130, 0.5);
   }
 
   .trust-toggle {
     position: absolute;
     top: calc(12px + env(safe-area-inset-top));
-    right: 112px;
+    right: 208px;
     width: 40px;
     height: 40px;
     background: rgba(30, 40, 70, 0.6);
@@ -811,19 +1012,10 @@
     box-shadow: 0 0 12px rgba(180, 160, 255, 0.3);
   }
 
-  @media (max-width: 480px) {
-    .trust-toggle {
-      width: 36px;
-      height: 36px;
-      right: 100px;
-      font-size: 0.9rem;
-    }
-  }
-
   .rewind-toggle {
     position: absolute;
     top: calc(12px + env(safe-area-inset-top));
-    right: 160px;
+    right: 256px;
     width: 40px;
     height: 40px;
     background: rgba(20, 30, 60, 0.6);
@@ -1238,7 +1430,7 @@
     .rewind-toggle {
       width: 36px;
       height: 36px;
-      right: 144px;
+      right: 216px;
       font-size: 0.9rem;
     }
 

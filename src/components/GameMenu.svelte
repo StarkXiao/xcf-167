@@ -29,10 +29,24 @@
     mode = 'load';
   }
 
+  function buildPreview(state: GameState): string {
+    const parts: string[] = [`节点: ${state.currentNodeId}`];
+    if (state.anonymousSenderState) {
+      const as = state.anonymousSenderState;
+      const emailCount = as.emails.length;
+      const terminalCount = as.terminalRecords.length;
+      const unreadTotal = as.unreadEmailCount + as.unreadTerminalCount;
+      if (emailCount > 0 || terminalCount > 0) {
+        parts.push(`📧${emailCount} 💻${terminalCount}${unreadTotal > 0 ? ` ⚠${unreadTotal}` : ''}`);
+      }
+    }
+    return parts.join(' · ');
+  }
+
   function handleSave(slotId: number) {
     playSFX('select');
     const state = get(gameState);
-    const preview = `进度: ${state.currentNodeId}`;
+    const preview = buildPreview(state);
     saveToSlot(slotId, state, preview);
     refreshSlots();
   }
