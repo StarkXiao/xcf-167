@@ -347,38 +347,6 @@ export const achievements: Achievement[] = [
       archiveId: 'archive_awareness',
       audioId: 'audio_loop'
     }
-  },
-  {
-    id: 'ach_pseudo_live_viewer',
-    title: '观众与后台观察者',
-    description: '首次以伪直播模式通关任意结局',
-    icon: '🎬',
-    category: 'special',
-    isSecret: false,
-    rarity: 'rare',
-    condition: {
-      requiredPlaythroughAtLeast: 2
-    },
-    reward: {
-      archiveId: 'archive_pseudo_live'
-    }
-  },
-  {
-    id: 'ach_backstage_hunter',
-    title: '后台潜水员',
-    description: '查看10条以上后台视角专属弹幕',
-    icon: '🔭',
-    category: 'secret',
-    isSecret: true,
-    rarity: 'epic',
-    unlockHint: '在二周目开启伪直播模式的后台视角...',
-    condition: {
-      requiredPlaythroughAtLeast: 3
-    },
-    reward: {
-      archiveId: 'archive_backstage',
-      audioId: 'audio_backstage'
-    }
   }
 ];
 
@@ -536,20 +504,6 @@ export const archives: ArchiveEntry[] = [
     content: '"你以为你在选择我们的命运？其实是你每次都选了让我们死得更惨的那条路。"\n\n当阿海说出这句话的时候，他已经不是原来的那个他了。\n\n在多次循环后，某些NPC会产生"觉醒"现象——他们开始意识到自己是循环中的角色，意识到有一个"玩家"在操控他们的命运。\n\n目前的处理方案：重置循环，清除记忆。\n\n但每次清除后，觉醒的速度都会更快一点。\n\n——系统异常日志',
     category: 'secret',
     isUnlocked: false
-  },
-  {
-    id: 'archive_pseudo_live',
-    title: '【档案·21】伪直播模式',
-    content: '【系统功能说明】\n\n伪直播模式（Pseudo-Live Mode）是一种沉浸式体验增强功能。\n\n首周目：\n- 关键弹幕被隐藏，模拟"直播实时性"——你只能看到普通观众的弹幕\n- 隐藏内鬼、知情人的提示，让你体验第一次观看时的迷茫\n\n二周目及以后：\n- 开放"后台视角"——可以看到系统管理员、协议监控等内部弹幕\n- 显示被隐藏的关键弹幕，并标注"[关键]"标签\n- 解锁更微妙的线索和提示\n- 字幕节奏自动调整，让你更快地浏览已知内容\n\n这种设计的目的是：让第一次体验更有悬念，让重复体验更有深度。\n\n——系统设计文档 v2.7',
-    category: 'document',
-    isUnlocked: false
-  },
-  {
-    id: 'archive_backstage',
-    title: '【档案·22】后台弹幕记录',
-    content: '【机密】以下为直播期间来自内部ID的弹幕记录：\n\n02:14:33 · 系统后台：[警告] 直播ID与2044年退役编号匹配\n02:14:45 · 管理员日志：白名单用户已接入：深海知情人、项目编号07\n02:38:17 · 协议监控：检测到关键词：协议07。触发级别：黄色\n03:02:19 · AI观测系统：目标已锁定潜水器。状态：观测中。\n03:12:58 · 协议07状态：验收机制启动。当前进度：37%\n03:15:20 · 直播平台后台：检测到异常信号源，尝试切断连接...失败\n\n这些弹幕从未对普通观众显示。它们只存在于服务器日志中。\n\n或者说——只存在于"后台视角"中。\n\n——服务器日志备份，时间戳：03:17:42',
-    category: 'secret',
-    isUnlocked: false
   }
 ];
 
@@ -623,13 +577,6 @@ export const specialAudios: SpecialAudio[] = [
     title: '数据流改写',
     description: '二进制的雨，冲刷着时间的河床',
     sfxType: 'static',
-    isUnlocked: false
-  },
-  {
-    id: 'audio_backstage',
-    title: '后台信号',
-    description: '来自服务器日志深处的低语...',
-    sfxType: 'radio_noise',
     isUnlocked: false
   }
 ];

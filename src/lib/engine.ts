@@ -36,7 +36,8 @@ import {
   unlockClue,
   recordPlaythrough,
   isClueUnlocked,
-  globalMemory
+  shouldShowImportantDanmaku,
+  shouldShowBackendPerspective
 } from './memory';
 import { playSFX, playSFXWithRewind } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText } from './signalCorruption';
@@ -164,6 +165,8 @@ export function getCurrentDialogueWithMemory(): { line: DialogueLine; effectiveT
   const node = getCurrentNode();
   if (!node) return null;
   const state = get(gameState);
+  const pseudoLiveMode = get(settings).pseudoLiveMode;
+  const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
 
   let dialogues = node.dialogues;
   if (node.memoryDialogues && node.memoryDialogues.length > 0) {
@@ -173,6 +176,10 @@ export function getCurrentDialogueWithMemory(): { line: DialogueLine; effectiveT
     if (allMemoryOk) {
       dialogues = [...node.memoryDialogues, ...node.dialogues];
     }
+  }
+
+  if (!showBackend) {
+    dialogues = dialogues.filter(d => !d.isBackendOnly);
   }
 
   if (state.dialogueIndex >= dialogues.length) return null;
@@ -186,18 +193,38 @@ export function getCurrentDialogueWithMemory(): { line: DialogueLine; effectiveT
   };
 }
 
+function getFilteredDialogues(node: StoryNode): DialogueLine[] {
+  let dialogues = node.dialogues;
+  if (node.memoryDialogues && node.memoryDialogues.length > 0) {
+    const allMemoryOk = node.memoryDialogues.every(d =>
+      d.memoryCondition ? checkMemoryCondition(d.memoryCondition) : true
+    );
+    if (allMemoryOk) {
+      dialogues = [...node.memoryDialogues, ...node.dialogues];
+    }
+  }
+  const pseudoLiveMode = get(settings).pseudoLiveMode;
+  const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
+  if (!showBackend) {
+    dialogues = dialogues.filter(d => !d.isBackendOnly);
+  }
+  return dialogues;
+}
+
 export function canAdvance(): boolean {
   const node = getCurrentNode();
   if (!node) return false;
   const state = get(gameState);
-  return state.dialogueIndex < node.dialogues.length - 1;
+  const dialogues = getFilteredDialogues(node);
+  return state.dialogueIndex < dialogues.length - 1;
 }
 
 export function isAtDialogueEnd(): boolean {
   const node = getCurrentNode();
   if (!node) return false;
   const state = get(gameState);
-  return state.dialogueIndex >= node.dialogues.length - 1;
+  const dialogues = getFilteredDialogues(node);
+  return state.dialogueIndex >= dialogues.length - 1;
 }
 
 export function hasChoices(): boolean {
@@ -512,12 +539,9 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
   const totalTypingDuration = calculateTotalTypingDuration(fullText, charDelay);
   const corruptionLevel = getCurrentCorruption();
   const rewindEffect = getActiveRewindEffect();
-  const memory = get(globalMemory);
-  const currentPlaythrough = memory.currentPlaythrough;
-  const gameSettings = get(settings);
-  const pseudoLiveEnabled = gameSettings.pseudoLiveMode;
-  const hideImportantFirst = gameSettings.hideImportantDanmakuFirstPlay;
-  const showBackstage = gameSettings.showBackstageView;
+  const pseudoLiveMode = get(settings).pseudoLiveMode;
+  const showImportant = shouldShowImportantDanmaku(pseudoLiveMode);
+  const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
   
   let relevantDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== undefined) {
@@ -527,20 +551,13 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
     return d.timestamp >= baseTime && d.timestamp < baseTime + 10000;
   });
 
-  relevantDanmakus = relevantDanmakus.filter(d => {
-    if (pseudoLiveEnabled && hideImportantFirst && currentPlaythrough === 1 && d.isImportant) {
-      return false;
-    }
-    if (d.isBackstageOnly) {
-      if (!pseudoLiveEnabled || !showBackstage) return false;
-      if (d.playthroughRequired && currentPlaythrough < d.playthroughRequired) return false;
-      if (!d.playthroughRequired && currentPlaythrough < 2) return false;
-    }
-    if (d.playthroughRequired && !d.isBackstageOnly) {
-      if (currentPlaythrough < d.playthroughRequired) return false;
-    }
-    return true;
-  });
+  if (!showImportant) {
+    relevantDanmakus = relevantDanmakus.filter(d => !d.isImportant);
+  }
+
+  if (!showBackend) {
+    relevantDanmakus = relevantDanmakus.filter(d => !d.isBackendOnly);
+  }
   
   if (rewindEffect?.danmakuReorderSeed !== undefined) {
     relevantDanmakus = shuffleDanmakusWithSeed(relevantDanmakus, rewindEffect.danmakuReorderSeed);
@@ -601,12 +618,9 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
   const elapsedMs = calculateCharTime(dialogue.text, charIndex, charDelay);
   const tolerance = charDelay * 3;
   const corruptionLevel = getCurrentCorruption();
-  const memory = get(globalMemory);
-  const currentPlaythrough = memory.currentPlaythrough;
-  const gameSettings = get(settings);
-  const pseudoLiveEnabled = gameSettings.pseudoLiveMode;
-  const hideImportantFirst = gameSettings.hideImportantDanmakuFirstPlay;
-  const showBackstage = gameSettings.showBackstageView;
+  const pseudoLiveMode = get(settings).pseudoLiveMode;
+  const showImportant = shouldShowImportantDanmaku(pseudoLiveMode);
+  const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
   
   let dueDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== dialogueIndex) return false;
@@ -614,20 +628,13 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
     return Math.abs(targetMs - elapsedMs) <= tolerance;
   });
 
-  dueDanmakus = dueDanmakus.filter(d => {
-    if (pseudoLiveEnabled && hideImportantFirst && currentPlaythrough === 1 && d.isImportant) {
-      return false;
-    }
-    if (d.isBackstageOnly) {
-      if (!pseudoLiveEnabled || !showBackstage) return false;
-      if (d.playthroughRequired && currentPlaythrough < d.playthroughRequired) return false;
-      if (!d.playthroughRequired && currentPlaythrough < 2) return false;
-    }
-    if (d.playthroughRequired && !d.isBackstageOnly) {
-      if (currentPlaythrough < d.playthroughRequired) return false;
-    }
-    return true;
-  });
+  if (!showImportant) {
+    dueDanmakus = dueDanmakus.filter(d => !d.isImportant);
+  }
+
+  if (!showBackend) {
+    dueDanmakus = dueDanmakus.filter(d => !d.isBackendOnly);
+  }
   
   dueDanmakus.forEach(danmaku => {
     const corruptedDanmaku = { ...danmaku };

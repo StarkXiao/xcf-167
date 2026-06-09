@@ -7,8 +7,7 @@ export interface Danmaku {
   relativeMs?: number;
   color?: string;
   isImportant?: boolean;
-  isBackstageOnly?: boolean;
-  playthroughRequired?: number;
+  isBackendOnly?: boolean;
 }
 
 export interface Choice {
@@ -92,6 +91,8 @@ export interface DialogueLine {
   memoryHints?: AudioHint[];
   memoryCondition?: MemoryCondition;
   isMemoryLine?: boolean;
+  isBackendOnly?: boolean;
+  backendPerspective?: boolean;
 }
 
 export interface StoryNode {

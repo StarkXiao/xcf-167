@@ -12,9 +12,6 @@ export interface GameSettings {
   danmakuEnabled: boolean;
   danmakuSpeed: number;
   pseudoLiveMode: boolean;
-  hideImportantDanmakuFirstPlay: boolean;
-  showBackstageView: boolean;
-  subtitleRhythmAdjust: boolean;
 }
 
 const defaultSettings: GameSettings = {
@@ -23,10 +20,7 @@ const defaultSettings: GameSettings = {
   sfxVolume: 0.7,
   danmakuEnabled: true,
   danmakuSpeed: 1,
-  pseudoLiveMode: false,
-  hideImportantDanmakuFirstPlay: true,
-  showBackstageView: true,
-  subtitleRhythmAdjust: true
+  pseudoLiveMode: true
 };
 
 function createDefaultAnonymousSenderState() {

@@ -6,8 +6,8 @@
   import type { DialogueLine, AudioTrigger, MoodType } from '../types/game';
   import { getEffectiveDialogue } from '../lib/engine';
   import { signalCorruption, glitchSubtitleText } from '../lib/signalCorruption';
-  import { currentPlaythrough } from '../lib/memory';
   import { get } from 'svelte/store';
+  import { currentPlaythrough } from '../lib/memory';
 
   export let dialogue: DialogueLine | null;
   export let onComplete: () => void;
@@ -28,16 +28,14 @@
   let lineGlitchSeed = 0;
   let glitchRefreshTimer: number | null = null;
   let displayedChars: string[] = [];
+  let isBackendOnly = false;
+  let backendPerspective = false;
 
   $: textSpeed = $settings.textSpeed;
   $: corruptionLevel = $signalCorruption.level;
-  $: pseudoLiveMode = $settings.pseudoLiveMode;
-  $: subtitleRhythmAdjust = $settings.subtitleRhythmAdjust;
-  $: showBackstageView = $settings.showBackstageView;
-  $: playthrough = $currentPlaythrough;
 
-  function getCharDelay(mood?: MoodType, baseSpeed?: number): number {
-    let base = baseSpeed !== undefined
+  function getCharDelay(mood?: MoodType, baseSpeed?: number, isBackendOnly?: boolean): number {
+    const base = baseSpeed !== undefined
       ? Math.max(15, 100 - baseSpeed)
       : Math.max(15, 100 - textSpeed);
     
@@ -49,13 +47,19 @@
       whisper: 1.6,
       urgent: 0.5
     };
-
-    if (pseudoLiveMode && subtitleRhythmAdjust) {
-      const playthroughAdjust = playthrough === 1 ? 1.0 : 0.85;
-      base = base * playthroughAdjust;
+    
+    let delay = base * (moodMultipliers[mood || 'normal']);
+    
+    const playthrough = $currentPlaythrough;
+    if (playthrough >= 2) {
+      delay *= 0.85;
     }
     
-    return base * (moodMultipliers[mood || 'normal']);
+    if (isBackendOnly) {
+      delay *= 0.7;
+    }
+    
+    return delay;
   }
 
   function getTypingSoundInterval(mood?: MoodType): number {
@@ -105,6 +109,8 @@
 
     const effective = getEffectiveDialogue(dialogue);
     isMemoryVariant = effective.isMemoryVariant;
+    isBackendOnly = dialogue.isBackendOnly || false;
+    backendPerspective = dialogue.backendPerspective || false;
     
     displayedText = '';
     displayedChars = [];
@@ -114,7 +120,7 @@
     
     const fullText = effective.text;
     const mood = dialogue.mood;
-    const charDelay = getCharDelay(mood, dialogue.baseTypingSpeed);
+    const charDelay = getCharDelay(mood, dialogue.baseTypingSpeed, dialogue.isBackendOnly);
     const soundInterval = getTypingSoundInterval(mood);
     const sfxTriggers = dialogue.sfx || [];
     const punctuationPause = charDelay * 2.5;
@@ -238,8 +244,6 @@
   class:corrupted-mild={corruptionLevel >= 20 && corruptionLevel < 45}
   class:corrupted-moderate={corruptionLevel >= 45 && corruptionLevel < 70}
   class:corrupted-severe={corruptionLevel >= 70}
-  class:pseudo-live-mode={pseudoLiveMode}
-  class:backstage-active={pseudoLiveMode && showBackstageView && playthrough >= 2}
 >
   {#if corruptionLevel >= 30}
     <div class="corruption-overlay"></div>
@@ -247,30 +251,28 @@
   {#if corruptionLevel >= 60}
     <div class="scanlines"></div>
   {/if}
-  {#if pseudoLiveMode && showBackstageView && playthrough >= 2}
-    <div class="backstage-hint">
-      <span class="bs-icon">◉</span>
-      <span class="bs-text">后台视角已启用 · 可查看隐藏弹幕与提示</span>
-    </div>
-  {/if}
   {#if dialogue}
-    {#if dialogue.speaker}
-      <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'} class:memory={isMemoryVariant}>
-        {dialogue.speaker}
-        {#if isMemoryVariant}
-          <span class="memory-tag">回忆</span>
-        {/if}
-      </div>
-    {/if}
-    <div 
-      class="dialogue-text"
-      class:tense-text={dialogue.mood === 'tense'}
-      class:scared-text={dialogue.mood === 'scared'}
-      class:whisper-text={dialogue.mood === 'whisper'}
-      class:urgent-text={dialogue.mood === 'urgent'}
-      class:memory-text={isMemoryVariant}
-      class:glitch-text={corruptionLevel >= 40}
-    >
+      {#if dialogue.speaker}
+        <div class="speaker-name" class:tense={dialogue.mood === 'tense' || dialogue.mood === 'urgent'} class:scared={dialogue.mood === 'scared'} class:whisper={dialogue.mood === 'whisper'} class:memory={isMemoryVariant} class:backend={isBackendOnly || backendPerspective}>
+          {dialogue.speaker}
+          {#if isMemoryVariant}
+            <span class="memory-tag">回忆</span>
+          {/if}
+          {#if isBackendOnly || backendPerspective}
+            <span class="backend-tag">后台</span>
+          {/if}
+        </div>
+      {/if}
+      <div 
+        class="dialogue-text"
+        class:tense-text={dialogue.mood === 'tense'}
+        class:scared-text={dialogue.mood === 'scared'}
+        class:whisper-text={dialogue.mood === 'whisper'}
+        class:urgent-text={dialogue.mood === 'urgent'}
+        class:memory-text={isMemoryVariant}
+        class:backend-text={isBackendOnly || backendPerspective}
+        class:glitch-text={corruptionLevel >= 40}
+      >
       {displayedText}
       {#if !isComplete}
         <span class="cursor">|</span>
@@ -308,45 +310,6 @@
     z-index: 30;
     cursor: pointer;
     outline: none;
-    transition: box-shadow 0.4s;
-  }
-
-  .dialogue-box.pseudo-live-mode {
-    border-top: 1px solid rgba(100, 180, 255, 0.15);
-  }
-
-  .dialogue-box.backstage-active {
-    background: linear-gradient(transparent, rgba(20, 15, 5, 0.95) 30%);
-    box-shadow: inset 0 0 80px rgba(255, 200, 100, 0.06);
-  }
-
-  .backstage-hint {
-    position: absolute;
-    top: 8px;
-    right: 16px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    background: rgba(60, 45, 20, 0.7);
-    border: 1px solid rgba(255, 200, 100, 0.35);
-    border-radius: 16px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.65rem;
-    color: #ffd890;
-    z-index: 8;
-    backdrop-filter: blur(6px);
-  }
-
-  .bs-icon {
-    color: #ffc864;
-    animation: bsPulse 1.8s infinite;
-    font-size: 0.7rem;
-  }
-
-  @keyframes bsPulse {
-    0%, 100% { opacity: 1; text-shadow: 0 0 4px rgba(255, 200, 100, 0.6); }
-    50% { opacity: 0.5; text-shadow: 0 0 1px rgba(255, 200, 100, 0.2); }
   }
 
   .speaker-name {
@@ -388,6 +351,12 @@
     color: #ffe8c0;
   }
 
+  .speaker-name.backend {
+    background: linear-gradient(135deg, rgba(0, 180, 150, 0.7), rgba(0, 130, 110, 0.7));
+    border-color: rgba(0, 255, 200, 0.5);
+    color: #c0fff0;
+  }
+
   .memory-tag {
     margin-left: 8px;
     padding: 1px 8px;
@@ -396,6 +365,17 @@
     border-radius: 10px;
     font-size: 0.7rem;
     color: #ffd890;
+  }
+
+  .backend-tag {
+    margin-left: 8px;
+    padding: 1px 8px;
+    background: rgba(0, 255, 200, 0.15);
+    border: 1px solid rgba(0, 255, 200, 0.4);
+    border-radius: 10px;
+    font-size: 0.7rem;
+    color: #00ffcc;
+    font-family: 'Courier New', monospace;
   }
 
   .dialogue-text {
@@ -437,6 +417,14 @@
     border: 1px solid rgba(255, 200, 100, 0.4);
     color: #ffe8c0;
     box-shadow: 0 0 20px rgba(255, 180, 80, 0.15);
+  }
+
+  .backend-text {
+    background: rgba(0, 35, 30, 0.92);
+    border: 1px solid rgba(0, 255, 200, 0.4);
+    color: #a0ffe8;
+    box-shadow: 0 0 20px rgba(0, 255, 200, 0.15);
+    font-family: 'Courier New', monospace;
   }
 
   .cursor {

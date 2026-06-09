@@ -9,10 +9,9 @@ const mkDanmaku = (
   relativeMs?: number,
   color?: string,
   isImportant?: boolean,
-  isBackstageOnly?: boolean,
-  playthroughRequired?: number
+  isBackendOnly?: boolean
 ): Danmaku => ({
-  id, username, content, timestamp, dialogueIndex, relativeMs, color, isImportant, isBackstageOnly, playthroughRequired
+  id, username, content, timestamp, dialogueIndex, relativeMs, color, isImportant, isBackendOnly
 });
 
 const mkLine = (
@@ -104,8 +103,9 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d4', '潜水员老张', '这个深度...祝平安', 2500, 3, 800, '#99ff99', true),
       mkDanmaku('d5', '路人甲', '弹幕护体！', 3500, 4, 300),
       mkDanmaku('d6', '好奇心害死猫', '我有种不好的预感', 4500, 5, 1500, '#ffcc00'),
-      mkDanmaku('d_bs_1', '系统后台', '[警告] 直播ID与2044年退役编号匹配', 3000, 2, 1200, '#ffc864', false, true, 2),
-      mkDanmaku('d_bs_2', '管理员日志', '白名单用户已接入：深海知情人、项目编号07', 4000, 3, 1500, '#ffc864', false, true, 2)
+      mkDanmaku('d_backend_1', '【后台】系统', '数据校验中...', 600, 1, 400, '#00ffcc', false, true),
+      mkDanmaku('d_backend_2', '【后台】监控', '检测到异常连接：观众数据源: 2847291 真实观众', 1800, 2, 800, '#00ffcc', false, true),
+      mkDanmaku('d_backend_3', '【后台】协议', '协议07已加载完毕', 3200, 3, 1200, '#00ffcc', false, true)
     ]
   },
   {
@@ -447,9 +447,7 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d25', '匿名用户0x7F', '关掉直播。现在。', 800, 4, 200, '#ff0000', true),
       mkDanmaku('d26', '我是谁我在哪', '我在做梦对吧？这不可能是真的', 1500, 5, 300, '#ffffff'),
       mkDanmaku('d27', '阿海铁粉', '阿海快跑！！！', 2000, 5, 1200, '#ff6666', true),
-      mkDanmaku('d28', '内部人士', '那个编号...深渊号不是三年前就退役了吗？', 2800, 6, 500, '#99ffff', true),
-      mkDanmaku('d_bs_3', '协议监控', '检测到关键词：协议07。触发级别：黄色', 500, 3, 800, '#ffc864', false, true, 2),
-      mkDanmaku('d_bs_4', 'AI观测系统', '目标已锁定潜水器。状态：观测中。', 1800, 5, 600, '#ffc864', false, true, 2)
+      mkDanmaku('d28', '内部人士', '那个编号...深渊号不是三年前就退役了吗？', 2800, 6, 500, '#99ffff', true)
     ]
   },
   {
@@ -949,9 +947,7 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d35', '系统消息', '该内容已被管理员删除', 500, 8, 400, '#888888'),
       mkDanmaku('d36', '系统消息', '该内容已被管理员删除', 1000, 9, 0, '#888888'),
       mkDanmaku('d37', '系统消息', '该内容已被管理员删除', 1500, 9, 600, '#888888'),
-      mkDanmaku('d38', '漏网之鱼', '它不是攻击我们，它在【数据损坏】', 2200, 9, 1500, '#ff0000', true),
-      mkDanmaku('d_bs_5', '协议07状态', '验收机制启动。当前进度：37%', 800, 8, 900, '#ffc864', false, true, 2),
-      mkDanmaku('d_bs_6', '直播平台后台', '检测到异常信号源，尝试切断连接...失败', 1600, 9, 400, '#ffc864', false, true, 2)
+      mkDanmaku('d38', '漏网之鱼', '它不是攻击我们，它在【数据损坏】', 2200, 9, 1500, '#ff0000', true)
     ]
   },
   {

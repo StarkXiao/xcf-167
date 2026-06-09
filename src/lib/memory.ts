@@ -279,3 +279,23 @@ export function importMemory(memory: GlobalMemory): void {
     updatedAt: Date.now()
   });
 }
+
+export function isFirstPlaythrough(): boolean {
+  const memory = get(globalMemory);
+  return memory.currentPlaythrough <= 1;
+}
+
+export function isNewGamePlus(): boolean {
+  const memory = get(globalMemory);
+  return memory.currentPlaythrough >= 2;
+}
+
+export function shouldShowImportantDanmaku(pseudoLiveMode: boolean): boolean {
+  if (!pseudoLiveMode) return true;
+  return !isFirstPlaythrough();
+}
+
+export function shouldShowBackendPerspective(pseudoLiveMode: boolean): boolean {
+  if (!pseudoLiveMode) return false;
+  return isNewGamePlus();
+}

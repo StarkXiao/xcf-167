@@ -1,6 +1,8 @@
 <script lang="ts">
   import { playSFX, initAudio, resumeAudio } from '../lib/audio';
   import type { Ending } from '../types/game';
+  import { currentPlaythrough } from '../lib/memory';
+  import { settings } from '../lib/store';
 
   export let ending: Ending;
   export let onRestart: () => void;
@@ -36,6 +38,26 @@
     <div class="divider"></div>
 
     <p class="ending-description">{ending.description}</p>
+
+    {#if $settings.pseudoLiveMode}
+      <div class="pseudo-live-hint">
+        {#if $currentPlaythrough === 1}
+          <p class="hint-text">
+            <span class="hint-icon">📡</span>
+            伪直播模式已启用 —— 首周目部分关键弹幕已被过滤
+            <br />
+            <span class="hint-sub">完成二周目将解锁后台视角弹幕与对话</span>
+          </p>
+        {:else}
+          <p class="hint-text">
+            <span class="hint-icon">⚙️</span>
+            伪直播模式 · 后台视角已启用
+            <br />
+            <span class="hint-sub">所有隐藏弹幕与剧情线索已开放</span>
+          </p>
+        {/if}
+      </div>
+    {/if}
 
     <div class="ending-actions">
       <button class="action-btn primary" on:click={handleRestart}>
@@ -108,6 +130,31 @@
     line-height: 1.9;
     margin-bottom: 40px;
     text-align: center;
+  }
+
+  .pseudo-live-hint {
+    margin-bottom: 30px;
+    padding: 14px 18px;
+    background: rgba(0, 30, 50, 0.5);
+    border: 1px solid rgba(100, 180, 255, 0.25);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+  }
+
+  .hint-text {
+    margin: 0;
+    color: #64c8ff;
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+
+  .hint-icon {
+    margin-right: 6px;
+  }
+
+  .hint-sub {
+    color: #80a0c0;
+    font-size: 0.78rem;
   }
 
   .ending-actions {
