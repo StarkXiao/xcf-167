@@ -639,4 +639,77 @@ export interface AchievementState {
   currentPath?: string;
 }
 
+export type CaseSeverity = 'critical' | 'major' | 'minor' | 'unclassified';
+
+export type CaseStatus = 'open' | 'closed' | 'classified' | 'expunged';
+
+export interface TimelineEvent {
+  id: string;
+  timestamp: string;
+  label: string;
+  description: string;
+  nodeId?: string;
+  depth?: string;
+  speaker?: string;
+  tags: string[];
+  importance: number;
+}
+
+export interface CaseFile {
+  id: string;
+  title: string;
+  designation: string;
+  status: CaseStatus;
+  severity: CaseSeverity;
+  date: string;
+  location: string;
+  depth: string;
+  summary: string;
+  timeline: TimelineEvent[];
+  evidenceIds: string[];
+  audioLogIds: string[];
+  relatedCaseIds: string[];
+  personnelInvolved: string[];
+  classifiedInfo?: string;
+}
+
+export type ArchiveTab = 'cases' | 'timeline' | 'evidence' | 'audio' | 'sync';
+
+export interface SyncRecord {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  lastSyncAt: number;
+  saveSlotCount: number;
+  memoryClueCount: number;
+  playthroughCount: number;
+}
+
+export interface SyncPayload {
+  version: number;
+  exportedAt: number;
+  deviceId: string;
+  deviceName: string;
+  saveSlots: string;
+  memory: string;
+  settings: string;
+}
+
+export interface ArchiveState {
+  activeTab: ArchiveTab;
+  selectedCaseId: string | null;
+  evidenceFilter: {
+    type: EvidenceType | 'all';
+    tag: string | null;
+    search: string;
+  };
+  timelineZoom: 'full' | 'chapter' | 'detail';
+  audioPlayback: {
+    currentSfxId: string | null;
+    isPlaying: boolean;
+    loop: boolean;
+  };
+  syncDevices: SyncRecord[];
+}
+
 

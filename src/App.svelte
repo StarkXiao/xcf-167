@@ -7,6 +7,7 @@
   import AchievementsGallery from './components/AchievementsGallery.svelte';
   import ChapterReview from './components/ChapterReview.svelte';
   import ChapterEndOverlay from './components/ChapterEndOverlay.svelte';
+  import ArchiveHub from './components/ArchiveHub.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue, getCurrentNode } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
@@ -31,6 +32,7 @@
   let showAchievements = false;
   let showChapterReview = false;
   let showChapterEnd = false;
+  let showArchive = false;
   let chapterEndNodeId = '';
 
   function handleNewGame() {
@@ -71,6 +73,10 @@
     showChapterReview = true;
   }
 
+  function handleShowArchive() {
+    showArchive = true;
+  }
+
   function handleBackToMenu() {
     stopBGM();
     if (get(isInChapterReplay)) {
@@ -95,6 +101,10 @@
 
   function handleCloseChapterReview() {
     showChapterReview = false;
+  }
+
+  function handleCloseArchive() {
+    showArchive = false;
   }
 
   function handleReplayChapter(chapter: ChapterDefinition) {
@@ -208,6 +218,7 @@
       onShowSettings={handleShowSettings}
       onShowAchievements={handleShowAchievements}
       onShowChapterReview={handleShowChapterReview}
+      onShowArchive={handleShowArchive}
     />
   {:else if scene === 'playing'}
     <GameScene 
@@ -234,6 +245,7 @@
     onKeepGoing={handleChapterEndKeepGoing}
     onSaveAndExit={handleChapterEndSaveAndExit}
   />
+  <ArchiveHub isOpen={showArchive} onClose={handleCloseArchive} />
 </div>
 
 <style>

@@ -13,6 +13,7 @@
   export let onShowSettings: () => void;
   export let onShowAchievements: () => void;
   export let onShowChapterReview: () => void;
+  export let onShowArchive: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -69,6 +70,11 @@
   function handleChapterReview() {
     playSFX('click');
     onShowChapterReview();
+  }
+
+  function handleArchive() {
+    playSFX('click');
+    onShowArchive();
   }
 
   function backToMenu() {
@@ -163,6 +169,11 @@
         <button class="menu-btn" on:click={handleChapterReview}>
           <span class="btn-icon">📋</span>
           <span class="btn-text">章节复盘</span>
+        </button>
+
+        <button class="menu-btn" on:click={handleArchive}>
+          <span class="btn-icon">🗄</span>
+          <span class="btn-text">事故档案库</span>
         </button>
 
         <button class="menu-btn" on:click={handleSettings}>
