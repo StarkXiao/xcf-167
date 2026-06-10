@@ -8,6 +8,7 @@
   export let onRestart: () => void;
   export let onBackToMenu: () => void;
   export let onShowEndings: () => void;
+  export let onShowChapterReview: () => void = () => {};
 
   function handleRestart() {
     playSFX('select');
@@ -22,6 +23,11 @@
   function handleGallery() {
     playSFX('click');
     onShowEndings();
+  }
+
+  function handleChapterReview() {
+    playSFX('click');
+    onShowChapterReview();
   }
 </script>
 
@@ -62,6 +68,9 @@
     <div class="ending-actions">
       <button class="action-btn primary" on:click={handleRestart}>
         <span>重新开始</span>
+      </button>
+      <button class="action-btn" on:click={handleChapterReview}>
+        <span>章节复盘</span>
       </button>
       <button class="action-btn" on:click={handleGallery}>
         <span>结局收集</span>

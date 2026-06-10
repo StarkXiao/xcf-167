@@ -93,6 +93,7 @@
 
   export let onBackToMenu: () => void;
   export let onShowEndingsGallery: () => void;
+  export let onShowChapterReview: () => void = () => {};
 
   let currentNode: StoryNode | undefined;
   let currentDialogue: DialogueLine | null = null;
@@ -509,6 +510,7 @@
       onRestart={handleRestart}
       onBackToMenu={onBackToMenu}
       onShowEndings={handleShowEndings}
+      onShowChapterReview={onShowChapterReview}
     />
   {/if}
 

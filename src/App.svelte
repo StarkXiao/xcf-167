@@ -5,17 +5,24 @@
   import EndingsGallery from './components/EndingsGallery.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import AchievementsGallery from './components/AchievementsGallery.svelte';
+  import ChapterReview from './components/ChapterReview.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
   import { resetAnonymousSenderState, restoreAnonymousSenderState } from './lib/anonymousSender';
-  import type { GameScene as GameSceneType, SaveSlot } from './types/game';
+  import { addChapterRecord, getChapterNodeIds } from './lib/chapterReview';
+  import { currentPlaythrough } from './lib/memory';
+  import type { GameScene as GameSceneType, SaveSlot, ChapterDefinition, ChapterPlayRecord } from './types/game';
   import { get } from 'svelte/store';
 
   let scene: GameSceneType = 'menu';
   let showSettings = false;
   let showEndings = false;
   let showAchievements = false;
+  let showChapterReview = false;
+
+  let chapterReplayVars: Record<string, string | number | boolean> | null = null;
+  let chapterReplayChapterId: string | null = null;
 
   function handleNewGame() {
     resetGameState();
@@ -49,8 +56,17 @@
     showAchievements = true;
   }
 
+  function handleShowChapterReview() {
+    showChapterReview = true;
+  }
+
   function handleBackToMenu() {
     stopBGM();
+    if (chapterReplayChapterId) {
+      recordChapterReplayCompletion();
+      chapterReplayVars = null;
+      chapterReplayChapterId = null;
+    }
     scene = 'menu';
   }
 
@@ -66,6 +82,57 @@
     showAchievements = false;
   }
 
+  function handleCloseChapterReview() {
+    showChapterReview = false;
+  }
+
+  function handleReplayChapter(chapter: ChapterDefinition) {
+    resetGameState();
+    resetAnonymousSenderState();
+    chapterReplayVars = {};
+    chapterReplayChapterId = chapter.id;
+    goToNode(chapter.startNodeId);
+    scene = 'playing';
+    setTimeout(() => {
+      triggerDanmakusForDialogue(0);
+    }, 200);
+  }
+
+  function recordChapterReplayCompletion() {
+    if (!chapterReplayChapterId || !chapterReplayVars) return;
+    const state = get(gameState);
+    const nodeIds = getChapterNodeIds(chapterReplayChapterId);
+    const isInChapter = nodeIds.has(state.currentNodeId);
+
+    if (!isInChapter && state.visitedNodes.some(nId => nodeIds.has(nId))) {
+      const varsBefore = chapterReplayVars;
+      const varsAfter = { ...state.variables };
+      const cluesHit: string[] = [];
+      for (const [key, val] of Object.entries(varsAfter)) {
+        if (
+          (key.startsWith('clue') || key.startsWith('full_truth')) &&
+          varsBefore[key] !== val
+        ) {
+          cluesHit.push(key);
+        }
+      }
+
+      const record: ChapterPlayRecord = {
+        chapterId: chapterReplayChapterId,
+        nodeId: state.currentNodeId,
+        variablesBefore: varsBefore,
+        variablesAfter: varsAfter,
+        choicesMade: [],
+        cluesHit,
+        trustChanges: [],
+        danmakuHighlights: [],
+        timestamp: Date.now(),
+        playthroughNumber: get(currentPlaythrough)
+      };
+      addChapterRecord(record);
+    }
+  }
+
   onMount(() => {
     initAudio();
   });
@@ -79,14 +146,16 @@
       onShowEndings={handleShowEndings}
       onShowSettings={handleShowSettings}
       onShowAchievements={handleShowAchievements}
+      onShowChapterReview={handleShowChapterReview}
     />
   {:else if scene === 'playing'}
-    <GameScene onBackToMenu={handleBackToMenu} onShowEndingsGallery={handleShowEndings} />
+    <GameScene onBackToMenu={handleBackToMenu} onShowEndingsGallery={handleShowEndings} onShowChapterReview={handleShowChapterReview} />
   {/if}
 
   <EndingsGallery isOpen={showEndings} onClose={handleCloseEndings} />
   <SettingsPanel isOpen={showSettings} onClose={handleCloseSettings} />
   <AchievementsGallery isOpen={showAchievements} onClose={handleCloseAchievements} />
+  <ChapterReview isOpen={showChapterReview} onClose={handleCloseChapterReview} onReplayChapter={handleReplayChapter} />
 </div>
 
 <style>

@@ -12,6 +12,7 @@
   export let onShowEndings: () => void;
   export let onShowSettings: () => void;
   export let onShowAchievements: () => void;
+  export let onShowChapterReview: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -63,6 +64,11 @@
   function handleAchievements() {
     playSFX('click');
     onShowAchievements();
+  }
+
+  function handleChapterReview() {
+    playSFX('click');
+    onShowChapterReview();
   }
 
   function backToMenu() {
@@ -152,6 +158,11 @@
               <span class="menu-badge">{$achievementProgress.unlocked}/{$achievementProgress.total}</span>
             {/if}
           </span>
+        </button>
+
+        <button class="menu-btn" on:click={handleChapterReview}>
+          <span class="btn-icon">📋</span>
+          <span class="btn-text">章节复盘</span>
         </button>
 
         <button class="menu-btn" on:click={handleSettings}>

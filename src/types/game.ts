@@ -149,7 +149,50 @@ export interface SaveSlot {
   latestMessagePreview?: string;
 }
 
-export type GameScene = 'menu' | 'playing' | 'endings' | 'settings';
+export type GameScene = 'menu' | 'playing' | 'endings' | 'settings' | 'chapter_review';
+
+export interface ChapterDefinition {
+  id: string;
+  title: string;
+  startNodeId: string;
+  endNodeIds: string[];
+  description: string;
+  depth?: string;
+}
+
+export interface ChapterPlayRecord {
+  chapterId: string;
+  nodeId: string;
+  variablesBefore: Record<string, string | number | boolean>;
+  variablesAfter: Record<string, string | number | boolean>;
+  choicesMade: { nodeId: string; choiceId: string; choiceText: string }[];
+  cluesHit: string[];
+  trustChanges: { target: string; value: number; reason?: string }[];
+  danmakuHighlights: string[];
+  timestamp: number;
+  playthroughNumber: number;
+}
+
+export interface ChapterSaveSlot {
+  id: string;
+  chapterId: string;
+  nodeId: string;
+  dialogueIndex: number;
+  variables: Record<string, string | number | boolean>;
+  savedAt: number;
+  preview: string;
+}
+
+export interface EndingComparisonEntry {
+  endingId: string;
+  title: string;
+  isGood: boolean;
+  playthroughNumber: number;
+  completedAt: number;
+  keyChoices: { nodeId: string; choiceId: string; choiceText: string }[];
+  finalVariables: Record<string, string | number | boolean>;
+  cluesUnlocked: string[];
+}
 
 export type EvidenceType = 'danmaku' | 'dialogue' | 'sfx';
 
