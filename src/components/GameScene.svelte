@@ -97,7 +97,8 @@
     createChapterSave,
     getChapterSaves,
     getCurrentReplayProgress,
-    deleteChapterSave
+    deleteChapterSave,
+    recordReplayNodeSnapshot
   } from '../lib/chapterReview';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
   import { getNode, rewindToCheckpoint } from '../lib/engine';
@@ -196,8 +197,26 @@
 
     if (state.dialogueIndex < currentNode.dialogues.length) {
       currentDialogue = currentNode.dialogues[state.dialogueIndex];
+      if ($isInChapterReplay && currentDialogue) {
+        recordReplayNodeSnapshot(
+          currentNode.id,
+          state.dialogueIndex,
+          state.variables,
+          currentDialogue.text,
+          currentNode.title
+        );
+      }
     } else {
       currentDialogue = null;
+      if ($isInChapterReplay) {
+        recordReplayNodeSnapshot(
+          currentNode.id,
+          state.dialogueIndex,
+          state.variables,
+          currentNode.title || '',
+          currentNode.title
+        );
+      }
     }
 
     if (isAtDialogueEnd() && hasChoices()) {

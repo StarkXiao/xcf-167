@@ -22,7 +22,7 @@
     getCurrentReplayChapter
   } from './lib/chapterReview';
   import { currentPlaythrough } from './lib/memory';
-  import type { GameScene as GameSceneType, SaveSlot, ChapterDefinition, ChapterSaveSlot } from './types/game';
+  import type { GameScene as GameSceneType, SaveSlot, ChapterDefinition, ChapterSaveSlot, ChapterNodeSnapshot } from './types/game';
   import { get } from 'svelte/store';
 
   let scene: GameSceneType = 'menu';
@@ -132,6 +132,27 @@
     }, 200);
   }
 
+  function handleReplayFromSnapshot(snapshot: ChapterNodeSnapshot, chapterId: string) {
+    resetGameState();
+    resetAnonymousSenderState();
+
+    startChapterReplay(chapterId, snapshot.variables);
+
+    gameState.update(s => ({
+      ...s,
+      currentNodeId: snapshot.nodeId,
+      dialogueIndex: snapshot.dialogueIndex,
+      variables: { ...snapshot.variables }
+    }));
+
+    scene = 'playing';
+    showChapterReview = false;
+
+    setTimeout(() => {
+      triggerDanmakusForDialogue(snapshot.dialogueIndex);
+    }, 200);
+  }
+
   function handleNodeReached(nodeId: string) {
     if (!get(isInChapterReplay)) return;
 
@@ -205,6 +226,7 @@
     onClose={handleCloseChapterReview} 
     onReplayChapter={handleReplayChapter}
     onLoadChapterSave={handleLoadChapterSave}
+    onReplayFromSnapshot={handleReplayFromSnapshot}
   />
   <ChapterEndOverlay
     isOpen={showChapterEnd}

@@ -160,6 +160,15 @@ export interface ChapterDefinition {
   depth?: string;
 }
 
+export interface ChapterNodeSnapshot {
+  nodeId: string;
+  dialogueIndex: number;
+  variables: Record<string, string | number | boolean>;
+  dialoguePreview: string;
+  nodeTitle?: string;
+  visitedAt: number;
+}
+
 export interface ChapterPlayRecord {
   chapterId: string;
   nodeId: string;
@@ -171,6 +180,7 @@ export interface ChapterPlayRecord {
   danmakuHighlights: string[];
   timestamp: number;
   playthroughNumber: number;
+  nodeSnapshots: ChapterNodeSnapshot[];
 }
 
 export interface ChapterSaveSlot {

@@ -11,12 +11,13 @@
   } from '../lib/chapterReview';
   import { globalMemory, unlockedClueList } from '../lib/memory';
   import { getAllEndings } from '../lib/engine';
-  import type { ChapterDefinition, ChapterPlayRecord, ChapterSaveSlot } from '../types/game';
+  import type { ChapterDefinition, ChapterPlayRecord, ChapterSaveSlot, ChapterNodeSnapshot } from '../types/game';
 
   export let isOpen: boolean;
   export let onClose: () => void;
   export let onReplayChapter: (chapter: ChapterDefinition) => void;
   export let onLoadChapterSave: ((slot: ChapterSaveSlot) => void) | undefined = undefined;
+  export let onReplayFromSnapshot: ((snapshot: ChapterNodeSnapshot, chapterId: string) => void) | undefined = undefined;
 
   const allEndings = getAllEndings();
 
@@ -80,6 +81,14 @@
     playSFX('select');
     if (onLoadChapterSave) {
       onLoadChapterSave(slot);
+    }
+    handleClose();
+  }
+
+  function handleReplaySnapshot(snapshot: ChapterNodeSnapshot) {
+    playSFX('select');
+    if (onReplayFromSnapshot && selectedRecord) {
+      onReplayFromSnapshot(snapshot, selectedRecord.chapterId);
     }
     handleClose();
   }
@@ -282,6 +291,42 @@
         {:else}
           <div class="detail-section">
             <button class="back-btn" on:click={backToReviewList}>← 返回记录列表</button>
+
+            {#if selectedRecord.nodeSnapshots && selectedRecord.nodeSnapshots.length > 0}
+              <div class="detail-block">
+                <h4 class="detail-title">
+                  节点回放
+                  <span class="detail-subtitle">（从任意节点开始重放此片段）</span>
+                </h4>
+                <div class="snapshot-timeline">
+                  {#each selectedRecord.nodeSnapshots as snapshot, snapIdx}
+                    <div class="snapshot-card">
+                      <div class="snapshot-meta">
+                        <span class="snapshot-idx">#{snapIdx + 1}</span>
+                        {#if snapshot.nodeTitle}
+                          <span class="snapshot-title">{snapshot.nodeTitle}</span>
+                        {/if}
+                        <span class="snapshot-node">{snapshot.nodeId}</span>
+                        <span class="snapshot-dialogue-idx">对话 {snapshot.dialogueIndex + 1}</span>
+                      </div>
+                      {#if snapshot.dialoguePreview}
+                        <div class="snapshot-preview">
+                          {snapshot.dialoguePreview}
+                        </div>
+                      {/if}
+                      {#if onReplayFromSnapshot}
+                        <button
+                          class="replay-snapshot-btn"
+                          on:click={() => handleReplaySnapshot(snapshot)}
+                        >
+                          ▶ 从此处重放
+                        </button>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
 
             {#if selectedRecord.choicesMade.length > 0}
               <div class="detail-block">
@@ -1169,5 +1214,99 @@
 
   .save-item-btn.delete:hover {
     background: rgba(180, 60, 60, 0.4);
+  }
+
+  .detail-subtitle {
+    font-size: 0.72rem;
+    color: #6a8aaa;
+    font-weight: normal;
+    margin-left: 8px;
+  }
+
+  .snapshot-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .snapshot-card {
+    padding: 10px 12px;
+    background: rgba(30, 55, 90, 0.4);
+    border: 1px solid rgba(100, 180, 255, 0.12);
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .snapshot-card:hover {
+    background: rgba(40, 70, 120, 0.5);
+    border-color: rgba(100, 180, 255, 0.25);
+  }
+
+  .snapshot-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+
+  .snapshot-idx {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #5a9aba;
+    font-weight: 600;
+    background: rgba(40, 80, 130, 0.4);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .snapshot-title {
+    font-size: 0.8rem;
+    color: #ffd890;
+  }
+
+  .snapshot-node {
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    color: #6a8aaa;
+  }
+
+  .snapshot-dialogue-idx {
+    font-size: 0.72rem;
+    color: #7a9ab8;
+    background: rgba(60, 100, 160, 0.25);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .snapshot-preview {
+    font-size: 0.78rem;
+    color: #c0d8f0;
+    line-height: 1.5;
+    padding: 6px 10px;
+    background: rgba(0, 20, 50, 0.3);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    border-left: 2px solid rgba(100, 180, 255, 0.25);
+  }
+
+  .replay-snapshot-btn {
+    padding: 5px 14px;
+    background: linear-gradient(135deg, rgba(80, 160, 120, 0.6), rgba(50, 120, 90, 0.6));
+    border: 1px solid rgba(100, 212, 160, 0.35);
+    color: #e0fff0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    transition: all 0.2s;
+  }
+
+  .replay-snapshot-btn:hover {
+    background: linear-gradient(135deg, rgba(90, 180, 140, 0.7), rgba(60, 140, 110, 0.7));
+    border-color: rgba(100, 212, 160, 0.55);
+    transform: translateY(-1px);
   }
 </style>

@@ -5,7 +5,8 @@ import type {
   ChapterSaveSlot,
   EndingComparisonEntry,
   StoryNode,
-  GameState
+  GameState,
+  ChapterNodeSnapshot
 } from '../types/game';
 import { storyData } from '../data/story';
 import { globalMemory, currentPlaythrough } from './memory';
@@ -24,6 +25,7 @@ export interface ChapterReplaySession {
   trustChanges: { target: string; value: number; reason?: string }[];
   danmakuHighlights: string[];
   nodesVisited: string[];
+  nodeSnapshots: ChapterNodeSnapshot[];
   startTime: number;
   isActive: boolean;
 }
@@ -242,6 +244,7 @@ export function startChapterReplay(chapterId: string, initialVariables: Record<s
     trustChanges: [],
     danmakuHighlights: [],
     nodesVisited: [chapter.startNodeId],
+    nodeSnapshots: [],
     startTime: Date.now(),
     isActive: true
   };
@@ -297,7 +300,8 @@ export function endChapterReplay(
     trustChanges: session.trustChanges,
     danmakuHighlights: session.danmakuHighlights,
     timestamp: Date.now(),
-    playthroughNumber: get(currentPlaythrough)
+    playthroughNumber: get(currentPlaythrough),
+    nodeSnapshots: session.nodeSnapshots
   };
 
   chapterRecords.update(records => [...records, record]);
@@ -336,6 +340,40 @@ export function recordReplayNodeVisit(nodeId: string): void {
       nodesVisited: [...session.nodesVisited, nodeId]
     };
   });
+}
+
+export function recordReplayNodeSnapshot(
+  nodeId: string,
+  dialogueIndex: number,
+  variables: Record<string, string | number | boolean>,
+  dialoguePreview = '',
+  nodeTitle?: string
+): void {
+  replaySession.update(session => {
+    if (!session) return session;
+
+    const snapshot: ChapterNodeSnapshot = {
+      nodeId,
+      dialogueIndex,
+      variables: { ...variables },
+      dialoguePreview: dialoguePreview.slice(0, 80),
+      nodeTitle,
+      visitedAt: Date.now()
+    };
+
+    const filteredSnapshots = session.nodeSnapshots.filter(
+      s => !(s.nodeId === nodeId && s.dialogueIndex === dialogueIndex)
+    );
+
+    return {
+      ...session,
+      nodeSnapshots: [...filteredSnapshots, snapshot]
+    };
+  });
+}
+
+export function getNodeSnapshotsByRecord(record: ChapterPlayRecord): ChapterNodeSnapshot[] {
+  return record.nodeSnapshots || [];
 }
 
 export function recordReplayTrustChange(
