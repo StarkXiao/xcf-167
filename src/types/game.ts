@@ -284,12 +284,19 @@ export interface SystemDamageState {
   lastUpdate: number;
 }
 
+export type SystemAlertKind = 'damage' | 'repair';
+
+export type SystemAlertSeverity = 'warning' | 'critical' | 'offline' | 'repaired' | 'recovering';
+
 export interface DamageAlert {
   system: SubmarineSystem;
   message: string;
   timestamp: number;
-  severity: 'warning' | 'critical' | 'offline';
+  severity: SystemAlertSeverity;
   id: string;
+  kind: SystemAlertKind;
+  damageBefore?: number;
+  damageAfter?: number;
 }
 
 export interface HullDamageState {
@@ -312,7 +319,7 @@ export interface RepairEffect {
 
 export interface ChannelDegradation {
   visual: number;
-  danmaku: number;
+  communication: number;
   audio: number;
   control: number;
   power: number;

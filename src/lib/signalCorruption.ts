@@ -5,7 +5,7 @@ import { hullDamage } from './hullDamage';
 const GLITCH_CHARS = '░▒▓█▀▄■□●○◊◘◙☺☻♥♦♣♠♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼@#$%&*()_+-=[]{}|;:,.<>?/~`';
 
 const defaultChannelDegradation: ChannelDegradation = {
-  visual: 0, danmaku: 0, audio: 0, control: 0, power: 0, combined: 0
+  visual: 0, communication: 0, audio: 0, control: 0, power: 0, combined: 0
 };
 
 export const signalCorruption = writable<SignalCorruptionState>({
@@ -87,14 +87,14 @@ function getChannelDegradationFromHull(): ChannelDegradation {
   const state = get(hullDamage);
   const s = state.systems;
   const visual = Math.max(s.hull.damage, s.camera.damage) * 0.9;
-  const danmaku = s.communication.damage * 0.95;
+  const communication = s.communication.damage * 0.95;
   const audio = s.sonar.damage * 0.9;
   const control = s.control.damage * 0.85;
   const power = s.power.damage * 0.95;
-  const combined = visual * 0.25 + danmaku * 0.2 + audio * 0.2 + control * 0.15 + power * 0.2;
+  const combined = visual * 0.25 + communication * 0.2 + audio * 0.2 + control * 0.15 + power * 0.2;
   return {
     visual: Math.min(100, visual),
-    danmaku: Math.min(100, danmaku),
+    communication: Math.min(100, communication),
     audio: Math.min(100, audio),
     control: Math.min(100, control),
     power: Math.min(100, power),
@@ -162,7 +162,7 @@ export function glitchSubtitleText(text: string, corruptionLevel: number, seed?:
 
 export function calculateDanmakuDelay(baseDelay: number, corruptionLevel: number): number {
   const ch = getChannelLevel();
-  const danmakuCorruption = ch.danmaku;
+  const danmakuCorruption = ch.communication;
   const effectiveCorruption = Math.max(corruptionLevel, danmakuCorruption);
   if (effectiveCorruption < 10) return baseDelay;
   const intensity = effectiveCorruption / 100;
@@ -174,7 +174,7 @@ export function calculateDanmakuDelay(baseDelay: number, corruptionLevel: number
 
 export function getDanmakuReorderChance(corruptionLevel: number): number {
   const ch = getChannelLevel();
-  const effective = Math.max(corruptionLevel, ch.danmaku);
+  const effective = Math.max(corruptionLevel, ch.communication);
   return Math.min(0.6, (effective / 100) * 0.7);
 }
 

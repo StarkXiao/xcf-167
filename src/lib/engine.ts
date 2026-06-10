@@ -548,7 +548,7 @@ export function triggerDanmakusForDialogue(dialogueIndex: number, charDelay: num
   const showImportant = shouldShowImportantDanmaku(pseudoLiveMode);
   const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
 
-  const danmakuCorruption = Math.max(corruptionLevel, channelLevel.danmaku);
+  const danmakuCorruption = Math.max(corruptionLevel, channelLevel.communication);
   
   let relevantDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== undefined) {
@@ -632,7 +632,7 @@ export function triggerDanmakuAtChar(dialogueIndex: number, charIndex: number, c
   const pseudoLiveMode = get(settings).pseudoLiveMode;
   const showImportant = shouldShowImportantDanmaku(pseudoLiveMode);
   const showBackend = shouldShowBackendPerspective(pseudoLiveMode);
-  const danmakuCorruption = Math.max(corruptionLevel, channelLevel.danmaku);
+  const danmakuCorruption = Math.max(corruptionLevel, channelLevel.communication);
   
   let dueDanmakus = node.danmakus.filter(d => {
     if (d.dialogueIndex !== dialogueIndex) return false;

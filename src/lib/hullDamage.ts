@@ -6,7 +6,8 @@ import type {
   DamageEffect,
   RepairEffect,
   DamageAlert,
-  ChannelDegradation
+  ChannelDegradation,
+  SystemAlertSeverity
 } from '../types/game';
 import { SUBMARINE_SYSTEM_LABELS } from '../types/game';
 
@@ -62,20 +63,34 @@ export function destroyHullDamage(): void {
   }
 }
 
+function getDamageSeverity(target: number): SystemAlertSeverity {
+  if (target >= 90) return 'offline';
+  if (target >= 60) return 'critical';
+  if (target >= 30) return 'warning';
+  return 'recovering';
+}
+
+function getRepairSeverity(target: number, before: number): SystemAlertSeverity {
+  if (target <= 0) return 'repaired';
+  if (target < before - 25) return 'repaired';
+  return 'recovering';
+}
+
 export function applyDamage(effect: DamageEffect): void {
   hullDamage.update(state => {
     const sys = state.systems[effect.system];
+    const beforeTarget = sys.targetDamage;
     const newTarget = Math.min(100, sys.targetDamage + effect.damage);
-    const severity: DamageAlert['severity'] =
-      newTarget >= 90 ? 'offline' :
-      newTarget >= 60 ? 'critical' :
-      'warning';
+    const severity: SystemAlertSeverity = getDamageSeverity(newTarget);
     const alert: DamageAlert = {
       system: effect.system,
       message: effect.message || `${SUBMARINE_SYSTEM_LABELS[effect.system]}受损`,
       timestamp: Date.now(),
       severity,
-      id: `dmg_${state.alertIdCounter}`
+      id: `dmg_${state.alertIdCounter}`,
+      kind: 'damage',
+      damageBefore: beforeTarget,
+      damageAfter: newTarget
     };
     return {
       systems: {
@@ -91,13 +106,28 @@ export function applyDamage(effect: DamageEffect): void {
 export function applyRepair(effect: RepairEffect): void {
   hullDamage.update(state => {
     const sys = state.systems[effect.system];
+    const beforeTarget = sys.targetDamage;
     const newTarget = Math.max(0, sys.targetDamage - effect.amount);
+    const severity: SystemAlertSeverity = getRepairSeverity(newTarget, beforeTarget);
+    const alert: DamageAlert = {
+      system: effect.system,
+      message: effect.message || (newTarget <= 0
+        ? `${SUBMARINE_SYSTEM_LABELS[effect.system]}修复完成`
+        : `${SUBMARINE_SYSTEM_LABELS[effect.system]}正在修复`),
+      timestamp: Date.now(),
+      severity,
+      id: `rep_${state.alertIdCounter}`,
+      kind: 'repair',
+      damageBefore: beforeTarget,
+      damageAfter: newTarget
+    };
     return {
       systems: {
         ...state.systems,
         [effect.system]: { ...sys, targetDamage: newTarget }
       },
-      alerts: state.alerts
+      alerts: [...state.alerts, alert],
+      alertIdCounter: state.alertIdCounter + 1
     };
   });
 }
@@ -144,21 +174,21 @@ export function getChannelDegradation(): ChannelDegradation {
   const s = state.systems;
 
   const visual = Math.max(s.hull.damage, s.camera.damage) * 0.9;
-  const danmaku = s.communication.damage * 0.95;
+  const communication = s.communication.damage * 0.95;
   const audio = s.sonar.damage * 0.9;
   const control = s.control.damage * 0.85;
   const power = s.power.damage * 0.95;
 
   const combined =
     visual * 0.25 +
-    danmaku * 0.2 +
+    communication * 0.2 +
     audio * 0.2 +
     control * 0.15 +
     power * 0.2;
 
   return {
     visual: Math.min(100, visual),
-    danmaku: Math.min(100, danmaku),
+    communication: Math.min(100, communication),
     audio: Math.min(100, audio),
     control: Math.min(100, control),
     power: Math.min(100, power),
@@ -178,14 +208,14 @@ export function getOverallIntegrity(): number {
 export const channelDegradation = derived(hullDamage, ($state) => {
   const s = $state.systems;
   const visual = Math.max(s.hull.damage, s.camera.damage) * 0.9;
-  const danmaku = s.communication.damage * 0.95;
+  const communication = s.communication.damage * 0.95;
   const audio = s.sonar.damage * 0.9;
   const control = s.control.damage * 0.85;
   const power = s.power.damage * 0.95;
-  const combined = visual * 0.25 + danmaku * 0.2 + audio * 0.2 + control * 0.15 + power * 0.2;
+  const combined = visual * 0.25 + communication * 0.2 + audio * 0.2 + control * 0.15 + power * 0.2;
   return {
     visual: Math.min(100, visual),
-    danmaku: Math.min(100, danmaku),
+    communication: Math.min(100, communication),
     audio: Math.min(100, audio),
     control: Math.min(100, control),
     power: Math.min(100, power),

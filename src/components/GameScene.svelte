@@ -586,10 +586,15 @@
             class:alert-warning={alert.severity === 'warning'}
             class:alert-critical={alert.severity === 'critical'}
             class:alert-offline={alert.severity === 'offline'}
+            class:alert-recovering={alert.severity === 'recovering'}
+            class:alert-repaired={alert.severity === 'repaired'}
+            class:alert-kind-repair={alert.kind === 'repair'}
             on:click|stopPropagation={() => dismissAlert(alert.id)}
           >
             <span class="alert-icon">
-              {#if alert.severity === 'offline'}✕{:else if alert.severity === 'critical'}⚠{:else}⚡{/if}
+              {#if alert.kind === 'repair'}
+                {alert.severity === 'repaired' ? '✓' : '↺'}
+              {:else if alert.severity === 'offline'}✕{:else if alert.severity === 'critical'}⚠{:else}⚡{/if}
             </span>
             <span class="alert-text">{alert.message}</span>
           </div>
@@ -1235,6 +1240,23 @@
     animation: alertSlideIn 0.3s ease-out, criticalPulse 0.3s infinite;
   }
 
+  .damage-alert.alert-recovering {
+    background: rgba(100, 200, 255, 0.15);
+    border: 1px solid rgba(100, 200, 255, 0.4);
+    color: #64c8ff;
+  }
+
+  .damage-alert.alert-repaired {
+    background: rgba(100, 255, 180, 0.18);
+    border: 1px solid rgba(100, 255, 180, 0.5);
+    color: #64ffb4;
+    animation: alertSlideIn 0.3s ease-out, repairedGlow 1.2s ease-out;
+  }
+
+  .damage-alert.alert-kind-repair .alert-icon {
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+
   .alert-icon {
     font-size: 0.9rem;
     line-height: 1;
@@ -1252,6 +1274,12 @@
   @keyframes criticalPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
+  }
+
+  @keyframes repairedGlow {
+    0% { box-shadow: 0 0 0 0 rgba(100, 255, 180, 0.5); opacity: 0; }
+    20% { opacity: 1; }
+    100% { box-shadow: 0 0 20px 6px rgba(100, 255, 180, 0); }
   }
 
   .rewind-panel-backdrop {

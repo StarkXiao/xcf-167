@@ -15,7 +15,7 @@
   $: corruptionLevel = $signalCorruption.level;
   $: artifactChance = getVisualArtifactChance(corruptionLevel);
   $: channelLevel = getChannelLevel();
-  $: danmakuDegradation = channelLevel.danmaku;
+  $: danmakuDegradation = channelLevel.communication;
 
   function getTrack(danmakuId: string, width: number): number {
     const now = Date.now();
