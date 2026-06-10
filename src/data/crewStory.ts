@@ -232,7 +232,49 @@ export const crewNodes: CrewStoryNode[] = [
     bgm: 'mystery',
     isRewindCheckpoint: true,
     rewindCheckpointLabel: '船员视角入口',
-    effects: { crew_perspective_unlocked: true, ahai_fear: 10, xiaolin_fear: 20, laozhou_fear: 5, suboshi_fear: 15 }
+    effects: { crew_perspective_unlocked: true, ahai_fear: 10, xiaolin_fear: 20, laozhou_fear: 5, suboshi_fear: 15 },
+    choices: [
+      {
+        id: 'crew_select_ahai',
+        text: '【阿海】主播的视角——镜头背后的焦虑与愧疚',
+        nextNodeId: 'crew_ahai_start',
+        effect: { crew_selected_perspective: 'ahai' },
+        trustEffect: {
+          changes: [{ target: 'ahai', value: 10, reason: '选择理解阿海' }],
+          hintText: '你选择进入阿海的内心世界'
+        }
+      },
+      {
+        id: 'crew_select_xiaolin',
+        text: '【小林】摄影师的视角——三年前的阴影与镜头里的真相',
+        nextNodeId: 'crew_xiaolin_start',
+        effect: { crew_selected_perspective: 'xiaolin' },
+        trustEffect: {
+          changes: [{ target: 'xiaolin', value: 10, reason: '选择理解小林' }],
+          hintText: '你选择进入小林的内心世界'
+        }
+      },
+      {
+        id: 'crew_select_laozhou',
+        text: '【老周】工程师的视角——冷静表面下的十年秘密',
+        nextNodeId: 'crew_laozhou_start',
+        effect: { crew_selected_perspective: 'laozhou' },
+        trustEffect: {
+          changes: [{ target: 'laozhou', value: 10, reason: '选择理解老周' }],
+          hintText: '你选择进入老周的内心世界'
+        }
+      },
+      {
+        id: 'crew_select_suboshi',
+        text: '【苏博士】科学家的视角——知情者的矛盾与选择',
+        nextNodeId: 'crew_suboshi_start',
+        effect: { crew_selected_perspective: 'suboshi' },
+        trustEffect: {
+          changes: [{ target: 'suboshi', value: 10, reason: '选择理解苏博士' }],
+          hintText: '你选择进入苏博士的内心世界'
+        }
+      }
+    ]
   }),
 
   mkCrewNode('crew_ahai_start', 'ahai', '【阿海视角·开场】', [

@@ -100,8 +100,10 @@
     deleteChapterSave,
     recordReplayNodeSnapshot
   } from '../lib/chapterReview';
-  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
-  import { getNode, rewindToCheckpoint } from '../lib/engine';
+  import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint, CrewStoryNode, CrewPerspectiveId } from '../types/game';
+  import { getNode, rewindToCheckpoint, getCurrentCrewNode, isCrewNode } from '../lib/engine';
+  import { currentCrewPerspective, crewMentalStates } from '../lib/store';
+  import { CREW_PERSPECTIVE_CONFIG } from '../types/game';
 
   export let onBackToMenu: () => void;
   export let onShowEndingsGallery: () => void;
@@ -234,7 +236,15 @@
     }
 
     if (currentNode.background) {
-      if (currentNode.background === 'tense' || currentNode.background === 'damage') {
+      const crewNode = getCurrentCrewNode();
+      if (crewNode) {
+        const crewConfig = CREW_PERSPECTIVE_CONFIG[crewNode.perspectiveId];
+        if (crewConfig) {
+          playBGM(currentNode.bgm || crewConfig.defaultBgm);
+        } else {
+          playBGM('mystery');
+        }
+      } else if (currentNode.background === 'tense' || currentNode.background === 'damage') {
         playBGM('tense');
       } else if (currentNode.background === 'creature' || currentNode.background === 'dark') {
         playBGM('mystery');
@@ -477,6 +487,43 @@
     showChapterSavePanel = !showChapterSavePanel;
   }
 
+  const CREW_DISPLAY_NAMES: Record<string, string> = {
+    ahai: '👁 阿海',
+    xiaolin: '📷 小林',
+    laozhou: '🔧 老周',
+    suboshi: '🔬 苏博士'
+  };
+
+  const MENTAL_STATE_LABELS: Record<string, string> = {
+    calm: '冷静',
+    anxious: '焦虑',
+    terrified: '恐惧',
+    determined: '坚定',
+    broken: '崩溃',
+    resigned: '认命'
+  };
+
+  const MENTAL_STATE_COLORS: Record<string, string> = {
+    calm: '#66ff66',
+    anxious: '#ffcc00',
+    terrified: '#ff4444',
+    determined: '#44aaff',
+    broken: '#880000',
+    resigned: '#888888'
+  };
+
+  function getCrewDisplayName(id: string): string {
+    return CREW_DISPLAY_NAMES[id] || id;
+  }
+
+  function getMentalStateLabel(state: string): string {
+    return MENTAL_STATE_LABELS[state] || state;
+  }
+
+  function getMentalStateColor(state: string): string {
+    return MENTAL_STATE_COLORS[state] || '#888888';
+  }
+
   onMount(() => {
     initAudio();
     resumeAudio();
@@ -561,6 +608,23 @@
   {/if}
 
   <DanmakuLayer danmakus={$activeDanmakus} />
+
+  {#if $currentCrewPerspective}
+    {@const crewConfig = CREW_PERSPECTIVE_CONFIG[$currentCrewPerspective]}
+    {@const crewMental = $crewMentalStates[$currentCrewPerspective]}
+    <div class="crew-perspective-overlay" style="border-color: {crewConfig.innerVoiceColor};">
+      <div class="perspective-indicator">
+        <span class="perspective-name" style="color: {crewConfig.innerVoiceColor};">
+          {getCrewDisplayName($currentCrewPerspective)}
+        </span>
+        {#if crewMental}
+          <span class="mental-state" style="color: {getMentalStateColor(crewMental.mentalState)};">
+            {getMentalStateLabel(crewMental.mentalState)}
+          </span>
+        {/if}
+      </div>
+    </div>
+  {/if}
 
   {#if !isEnding}
     {#if !showChoices}
@@ -834,6 +898,49 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+  }
+
+  .crew-perspective-overlay {
+    position: absolute;
+    inset: 0;
+    border: 2px solid transparent;
+    border-radius: 0;
+    pointer-events: none;
+    z-index: 12;
+    animation: perspectiveFadeIn 0.8s ease-out;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.3);
+  }
+
+  .perspective-indicator {
+    position: absolute;
+    top: 50px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 6px 12px;
+    background: rgba(0, 10, 25, 0.7);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(4px);
+  }
+
+  .perspective-name {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .mental-state {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  @keyframes perspectiveFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .node-title-bar {

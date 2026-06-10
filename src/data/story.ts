@@ -443,6 +443,23 @@ export const nodes: StoryNode[] = [
           ],
           hintText: '你直接质疑苏博士和老周隐瞒了协议07的真相'
         }
+      },
+      {
+        id: 'c_crew_perspective',
+        text: '切换到船员视角——看看他们在镜头外经历了什么',
+        memoryText: '【二周目解锁】进入船员视角——从他们的眼睛看这一天',
+        nextNodeId: 'crew_perspective_select',
+        memoryCondition: { playthroughAtLeast: 2 },
+        effect: { crew_perspective_unlocked: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 10, reason: '试图理解船员' },
+            { target: 'xiaolin', value: 10, reason: '试图理解船员' },
+            { target: 'laozhou', value: 5, reason: '试图理解船员' },
+            { target: 'suboshi', value: 5, reason: '试图理解船员' }
+          ],
+          hintText: '你决定从船员的角度重新审视这一切'
+        }
       }
     ],
     danmakus: [

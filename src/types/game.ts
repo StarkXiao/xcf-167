@@ -135,6 +135,8 @@ export interface GameState {
   unlockedEndings: string[];
   visitedNodes: string[];
   anonymousSenderState?: Omit<AnonymousSenderState, 'activeNotification' | 'isMailboxOpen' | 'isTerminalOpen' | 'viewingEmailId' | 'viewingTerminalId'>;
+  crewMentalStates?: Record<CrewMemberId, CrewMentalState>;
+  currentCrewPerspective?: CrewPerspectiveId;
   createdAt: number;
   updatedAt: number;
 }

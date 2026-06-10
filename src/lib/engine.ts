@@ -9,9 +9,18 @@ import type {
   AudioHint,
   MemoryCondition,
   RewindCheckpoint,
-  RewindEffect
+  RewindEffect,
+  CrewStoryNode,
+  CrewChoice,
+  CrewEndingBranch,
+  CrewMemberId,
+  CrewDanmaku,
+  CrewInnerThought,
+  MentalStateChange,
+  CrewMentalState
 } from '../types/game';
 import { storyData } from '../data/story';
+import { crewStoryData } from '../data/crewStory';
 import {
   gameState,
   setCurrentNode,
@@ -23,7 +32,13 @@ import {
   clearDanmakus,
   resetGameState,
   isTyping,
-  settings
+  settings,
+  setCrewPerspective,
+  initCrewMentalStates,
+  applyMentalStateChanges,
+  currentCrewPerspective,
+  crewMentalStates,
+  updateCrewMentalState
 } from './store';
 import { get } from 'svelte/store';
 import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier, evidenceBoard } from './evidence';
@@ -41,7 +56,7 @@ import {
 } from './memory';
 import { playSFX, playSFXWithRewind } from './audio';
 import { calculateDanmakuDelay, getDanmakuReorderChance, getCurrentCorruption, glitchSubtitleText, getChannelLevel } from './signalCorruption';
-import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition, getLockedEnding } from './trust';
+import { applyTrustEffect, applyTrustEndingWeights, checkTrustCondition, getLockedEnding, getCrewTrust } from './trust';
 import type { TrustCondition, NextNodeBranch } from '../types/game';
 import {
   createCheckpoint,
@@ -55,15 +70,33 @@ import {
 import { checkAndUnlockAchievements, recordChoice, recordMisjudgment, getPlaythroughDataForRecord, resetPlaythroughTracking, setCurrentPath } from './achievements';
 import { applyDamageEffects, applyRepairEffects, resetHullDamage } from './hullDamage';
 
+const allNodes: StoryNode[] = [
+  ...storyData.nodes,
+  ...crewStoryData.nodes as StoryNode[]
+];
 
+const allEndings = [...storyData.endings, ...crewStoryData.endings as any[]];
+
+export function isCrewNode(node: StoryNode): node is CrewStoryNode {
+  return !!(node as CrewStoryNode).perspectiveId;
+}
+
+export function getCrewNode(nodeId: string): CrewStoryNode | undefined {
+  return crewStoryData.nodes.find(n => n.id === nodeId);
+}
 
 export function getNode(nodeId: string): StoryNode | undefined {
-  return storyData.nodes.find(n => n.id === nodeId);
+  return allNodes.find(n => n.id === nodeId);
 }
 
 export function getCurrentNode(): StoryNode | undefined {
   const state = get(gameState);
   return getNode(state.currentNodeId);
+}
+
+export function getCurrentCrewNode(): CrewStoryNode | undefined {
+  const state = get(gameState);
+  return getCrewNode(state.currentNodeId);
 }
 
 export function checkCondition(condition?: StateCondition): boolean {
@@ -97,7 +130,12 @@ export function applyEffect(effect?: StateEffect): void {
 
 export function getAvailableChoices(): Choice[] {
   const node = getCurrentNode();
-  if (!node?.choices) return [];
+  if (!node) return [];
+  const crewNode = getCrewNode(node.id);
+  if (crewNode?.crewChoices && crewNode.crewChoices.length > 0) {
+    return crewNode.crewChoices.filter(c => checkAllConditions(c.condition, c.memoryCondition, c.trustCondition));
+  }
+  if (!node.choices) return [];
   return node.choices.filter(c => checkAllConditions(c.condition, c.memoryCondition, c.trustCondition));
 }
 
@@ -278,8 +316,21 @@ export function advance(): void {
       return;
     }
     
+    const crewNode = getCrewNode(node.id);
+    if (crewNode?.crewChoices && crewNode.crewChoices.length > 0) {
+      return;
+    }
+    
     if (node.choices && node.choices.length > 0) {
       return;
+    }
+
+    if (crewNode?.crewEndingBranches && crewNode.crewEndingBranches.length > 0) {
+      const crewNextId = resolveCrewEndingBranches(crewNode.crewEndingBranches);
+      if (crewNextId) {
+        goToNode(crewNextId);
+        return;
+      }
     }
     
     const effectiveNextId = resolveNextNodeBranches(node, node.nextNodeId);
@@ -336,6 +387,55 @@ export function resolveNextNodeBranches(node: StoryNode, defaultNextId?: string)
   return defaultNextId;
 }
 
+function resolveCrewEndingBranches(branches: CrewEndingBranch[]): string | undefined {
+  const state = get(gameState);
+  const mentalStates: Record<CrewMemberId, CrewMentalState> = state.crewMentalStates || {} as Record<CrewMemberId, CrewMentalState>;
+
+  const sorted = [...branches].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+  for (const branch of sorted) {
+    const stateOk = !branch.condition || checkCondition(branch.condition);
+    const trustOk = !branch.trustCondition || checkTrustCondition(branch.trustCondition);
+    const memoryOk = !branch.memoryCondition || checkMemoryCondition(branch.memoryCondition);
+    
+    let perspectiveOk = true;
+    if (branch.requiredPerspectiveStates) {
+      for (const req of branch.requiredPerspectiveStates) {
+        const ms = mentalStates[req.memberId];
+        if (!ms) { perspectiveOk = false; break; }
+        if (req.minMentalState && ms.mentalState !== req.minMentalState) {
+          const stateOrder: Record<string, number> = { calm: 0, anxious: 1, determined: 2, terrified: 3, resigned: 4, broken: 5 };
+          if ((stateOrder[ms.mentalState] ?? 0) < (stateOrder[req.minMentalState] ?? 0)) { perspectiveOk = false; break; }
+        }
+        if (req.maxFearLevel !== undefined && ms.fearLevel > req.maxFearLevel) { perspectiveOk = false; break; }
+        if (req.minResolveLevel !== undefined && ms.resolveLevel < req.minResolveLevel) { perspectiveOk = false; break; }
+        if (req.requiredSecretExposure && ms.secretExposure !== req.requiredSecretExposure) { perspectiveOk = false; break; }
+        if (req.requiredHasConfessed !== undefined && ms.hasConfessed !== req.requiredHasConfessed) { perspectiveOk = false; break; }
+        if (req.requiredHasBrokenDown !== undefined && ms.hasBrokenDown !== req.requiredHasBrokenDown) { perspectiveOk = false; break; }
+      }
+    }
+
+    let relationshipOk = true;
+    if (branch.requiredCrewRelationships) {
+      for (const req of branch.requiredCrewRelationships) {
+        const trustVal = getTrustValue(req.from, req.to);
+        if (req.minTrust !== undefined && trustVal < req.minTrust) { relationshipOk = false; break; }
+        if (req.maxTrust !== undefined && trustVal > req.maxTrust) { relationshipOk = false; break; }
+      }
+    }
+
+    if (stateOk && trustOk && memoryOk && perspectiveOk && relationshipOk) {
+      return branch.nextNodeId;
+    }
+  }
+
+  return undefined;
+}
+
+function getTrustValue(from: CrewMemberId, to: CrewMemberId): number {
+  return getCrewTrust(to);
+}
+
 function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
   const endingRedirectMap: Record<string, { candidates: string[]; nodeMap: Record<string, string> }> = {
     ending_resolve_live: {
@@ -383,9 +483,20 @@ function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): strin
 
 export function selectChoice(choiceId: string): void {
   const node = getCurrentNode();
-  if (!node?.choices) return;
+  if (!node) return;
   
-  const choice = node.choices.find(c => c.id === choiceId);
+  const crewNode = getCrewNode(node.id);
+  let choice: Choice | undefined;
+  let crewChoice: CrewChoice | undefined;
+  
+  if (crewNode?.crewChoices && crewNode.crewChoices.length > 0) {
+    crewChoice = crewNode.crewChoices.find(c => c.id === choiceId);
+    choice = crewChoice;
+  }
+  if (!choice) {
+    choice = node.choices?.find(c => c.id === choiceId);
+  }
+  
   if (!choice || !checkAllConditions(choice.condition, choice.memoryCondition, choice.trustCondition)) return;
   
   if (choice.effect) {
@@ -394,6 +505,29 @@ export function selectChoice(choiceId: string): void {
 
   if (choice.trustEffect) {
     applyTrustEffect(choice.trustEffect);
+  }
+
+  if (crewChoice) {
+    if (crewChoice.affectsMentalState) {
+      applyMentalStateChanges(crewChoice.affectsMentalState);
+    }
+    if (crewChoice.crewRelationshipImpact) {
+      for (const rel of crewChoice.crewRelationshipImpact) {
+        applyTrustEffect({
+          changes: [{ target: rel.to, value: rel.trustDelta, reason: `${rel.from}的选择` }],
+          hintText: undefined
+        });
+      }
+    }
+    if (crewChoice.revealsSecretTo) {
+      for (const targetId of crewChoice.revealsSecretTo) {
+        const currentStates = get(gameState).crewMentalStates;
+        const sourceState = currentStates?.[crewChoice.perspectiveId];
+        if (sourceState && sourceState.secretExposure !== 'exposed') {
+          updateCrewMentalState(crewChoice.perspectiveId, { secretExposure: 'hinted' });
+        }
+      }
+    }
   }
 
   processChoiceMemoryEffect(choice);
@@ -458,6 +592,22 @@ export function goToNode(nodeId: string): void {
     finalizeRewind();
   }
   
+  const crewNode = getCrewNode(nodeId);
+  if (crewNode) {
+    initCrewMentalStates();
+    setCrewPerspective(crewNode.perspectiveId);
+    if (crewNode.perspectiveSwitch) {
+      const transitionSfx: Record<string, string> = {
+        seamless: 'click',
+        blackout: 'static',
+        glitch: 'radio_noise',
+        memory_flash: 'heartbeat'
+      };
+      const sfx = transitionSfx[crewNode.perspectiveSwitch.transitionType] || 'click';
+      playSFX(sfx as any, 0.5);
+    }
+  }
+
   clearDanmakus();
   setCurrentNode(nodeId);
 
@@ -476,8 +626,49 @@ export function goToNode(nodeId: string): void {
     triggerMemoryAudioHints(targetNode.dialogues[0]);
   }
   
-  if (targetNode.danmakus && targetNode.danmakus.length > 0) {
+  if (crewNode?.privateDanmakus && crewNode.privateDanmakus.length > 0) {
+    setTimeout(() => triggerCrewDanmakus(crewNode.privateDanmakus!), 500);
+  } else if (targetNode.danmakus && targetNode.danmakus.length > 0) {
     setTimeout(() => triggerDanmakusForDialogue(0), 300);
+  }
+
+  if (crewNode?.innerThoughts && crewNode.innerThoughts.length > 0) {
+    setTimeout(() => triggerInnerThoughts(crewNode.innerThoughts!), 800);
+  }
+}
+
+export function triggerCrewDanmakus(danmakus: CrewDanmaku[]): void {
+  const perspective = get(currentCrewPerspective);
+  for (const dm of danmakus) {
+    const isCurrentPerspective = dm.sourcePerspective === perspective;
+    if (dm.isPrivateChat && !isCurrentPerspective) continue;
+    if (dm.isInnerThought && !isCurrentPerspective) continue;
+    
+    addDanmaku({
+      ...dm,
+      color: dm.isInnerThought ? (dm.color || '#ff9999') : dm.color
+    });
+    
+    const displayDuration = dm.isInnerThought ? 6000 : 8000;
+    setTimeout(() => removeDanmaku(dm.id), displayDuration);
+  }
+}
+
+export function triggerInnerThoughts(thoughts: CrewInnerThought[]): void {
+  const perspective = get(currentCrewPerspective);
+  const relevantThoughts = thoughts.filter(t => t.perspectiveId === perspective);
+  
+  for (const thought of relevantThoughts) {
+    const thoughtDanmaku: Danmaku = {
+      id: `thought_${thought.perspectiveId}_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      username: thought.speaker,
+      content: thought.text,
+      timestamp: Date.now(),
+      color: '#ffcc99',
+      isImportant: thought.triggersSecret || thought.thoughtDepth === 'suppressed'
+    };
+    addDanmaku(thoughtDanmaku);
+    setTimeout(() => removeDanmaku(thoughtDanmaku.id), 7000);
   }
 }
 
@@ -680,9 +871,9 @@ export function restartGame(): void {
 }
 
 export function getAllEndings() {
-  return storyData.endings;
+  return allEndings;
 }
 
 export function getEndingById(id: string) {
-  return storyData.endings.find(e => e.id === id);
+  return allEndings.find(e => e.id === id);
 }
