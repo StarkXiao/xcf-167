@@ -48,7 +48,9 @@
       scared: 1.4,
       calm: 1.3,
       whisper: 1.6,
-      urgent: 0.5
+      urgent: 0.5,
+      mystery: 1.2,
+      terrified: 1.8
     };
     
     let delay = base * (moodMultipliers[mood || 'normal']);
@@ -72,7 +74,9 @@
       scared: 5,
       calm: 4,
       whisper: 8,
-      urgent: 1
+      urgent: 1,
+      mystery: 6,
+      terrified: 7
     };
     return intervals[mood || 'normal'];
   }

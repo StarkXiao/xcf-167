@@ -33,7 +33,7 @@ export interface StateEffect {
 
 export type BGMType = 'deep' | 'tense' | 'calm' | 'mystery';
 
-export type MoodType = 'normal' | 'tense' | 'scared' | 'calm' | 'whisper' | 'urgent';
+export type MoodType = 'normal' | 'tense' | 'scared' | 'calm' | 'whisper' | 'urgent' | 'mystery' | 'terrified';
 
 export type SFXType =
   | 'click' | 'select' | 'warning' | 'sonar' | 'bubbles'
@@ -711,5 +711,160 @@ export interface ArchiveState {
   };
   syncDevices: SyncRecord[];
 }
+
+export type CrewPerspectiveId = CrewMemberId;
+
+export type MentalState = 'calm' | 'anxious' | 'terrified' | 'determined' | 'broken' | 'resigned';
+
+export type SecretExposureLevel = 'hidden' | 'hinted' | 'suspected' | 'exposed';
+
+export interface CrewMentalState {
+  memberId: CrewMemberId;
+  mentalState: MentalState;
+  fearLevel: number;
+  anxietyLevel: number;
+  resolveLevel: number;
+  sanityEdge: number;
+  secretExposure: SecretExposureLevel;
+  hasBrokenDown: boolean;
+  hasConfessed: boolean;
+}
+
+export interface CrewPerspectiveConfig {
+  memberId: CrewMemberId;
+  defaultBgm: BGMType;
+  heartbeatBaseRate: number;
+  breathingPattern: 'normal' | 'shallow' | 'heavy' | 'held';
+  visualTint: string;
+  innerVoiceColor: string;
+  sensoryFilter: number;
+}
+
+export interface CrewInnerThought extends DialogueLine {
+  perspectiveId: CrewMemberId;
+  thoughtDepth: 'surface' | 'deep' | 'suppressed';
+  triggersSecret?: boolean;
+}
+
+export interface CrewDanmaku extends Danmaku {
+  sourcePerspective: CrewMemberId;
+  isInnerThought: boolean;
+  isPrivateChat: boolean;
+  targetMember?: CrewMemberId;
+}
+
+export interface MentalStateChange {
+  memberId: CrewMemberId;
+  mentalState?: MentalState;
+  fearDelta?: number;
+  anxietyDelta?: number;
+  resolveDelta?: number;
+  sanityDelta?: number;
+  secretExposure?: SecretExposureLevel;
+  hasBrokenDown?: boolean;
+  hasConfessed?: boolean;
+}
+
+export interface CrewStateEffect {
+  stateEffect?: StateEffect;
+  mentalStateChanges?: MentalStateChange[];
+}
+
+export interface CrewChoice extends Choice {
+  perspectiveId: CrewMemberId;
+  revealsSecretTo?: CrewMemberId[];
+  affectsMentalState?: MentalStateChange[];
+  crewRelationshipImpact?: {
+    from: CrewMemberId;
+    to: CrewMemberId;
+    trustDelta: number;
+  }[];
+}
+
+export interface CrewEndingBranch extends NextNodeBranch {
+  requiredPerspectiveStates?: {
+    memberId: CrewMemberId;
+    minMentalState?: MentalState;
+    maxFearLevel?: number;
+    minResolveLevel?: number;
+    requiredSecretExposure?: SecretExposureLevel;
+    requiredHasConfessed?: boolean;
+    requiredHasBrokenDown?: boolean;
+  }[];
+  requiredCrewRelationships?: {
+    from: CrewMemberId;
+    to: CrewMemberId;
+    minTrust?: number;
+    maxTrust?: number;
+  }[];
+}
+
+export interface CrewEnding extends Ending {
+  survivorIds: CrewMemberId[];
+  casualtyIds: CrewMemberId[];
+  perspectiveId: CrewPerspectiveId;
+  crossedEndingIds: string[];
+  truthRevealed: boolean;
+  crewFate: Record<CrewMemberId, string>;
+}
+
+export interface CrewStoryNode extends StoryNode {
+  perspectiveId: CrewPerspectiveId;
+  innerThoughts?: CrewInnerThought[];
+  privateDanmakus?: CrewDanmaku[];
+  crewChoices?: CrewChoice[];
+  crewEndingBranches?: CrewEndingBranch[];
+  sensoryEffects?: {
+    visualWarp: number;
+    audioDistortion: number;
+    textJitter: number;
+    heartbeatIntensity: number;
+    breathingIntensity: number;
+  };
+  perspectiveSwitch?: {
+    toPerspective: CrewMemberId;
+    triggerVariable?: string;
+    transitionType: 'seamless' | 'blackout' | 'glitch' | 'memory_flash';
+  };
+}
+
+export const CREW_PERSPECTIVE_CONFIG: Record<CrewPerspectiveId, CrewPerspectiveConfig> = {
+  ahai: {
+    memberId: 'ahai',
+    defaultBgm: 'tense',
+    heartbeatBaseRate: 85,
+    breathingPattern: 'shallow',
+    visualTint: 'rgba(255, 100, 100, 0.08)',
+    innerVoiceColor: '#ff9999',
+    sensoryFilter: 0.3
+  },
+  xiaolin: {
+    memberId: 'xiaolin',
+    defaultBgm: 'mystery',
+    heartbeatBaseRate: 95,
+    breathingPattern: 'held',
+    visualTint: 'rgba(100, 100, 255, 0.08)',
+    innerVoiceColor: '#9999ff',
+    sensoryFilter: 0.5
+  },
+  laozhou: {
+    memberId: 'laozhou',
+    defaultBgm: 'calm',
+    heartbeatBaseRate: 65,
+    breathingPattern: 'normal',
+    visualTint: 'rgba(100, 255, 100, 0.05)',
+    innerVoiceColor: '#99ff99',
+    sensoryFilter: 0.1
+  },
+  suboshi: {
+    memberId: 'suboshi',
+    defaultBgm: 'mystery',
+    heartbeatBaseRate: 75,
+    breathingPattern: 'heavy',
+    visualTint: 'rgba(255, 100, 255, 0.06)',
+    innerVoiceColor: '#ff99ff',
+    sensoryFilter: 0.2
+  }
+};
 
 

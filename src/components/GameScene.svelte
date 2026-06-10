@@ -280,7 +280,8 @@
       ? Math.max(15, 100 - d.baseTypingSpeed)
       : Math.max(15, 100 - textSpeed);
     const moodMultipliers: Record<MoodType, number> = {
-      normal: 1.0, tense: 0.7, scared: 1.4, calm: 1.3, whisper: 1.6, urgent: 0.5
+      normal: 1.0, tense: 0.7, scared: 1.4, calm: 1.3, whisper: 1.6, urgent: 0.5,
+      mystery: 1.2, terrified: 1.8
     };
     return base * moodMultipliers[d.mood || 'normal'];
   }

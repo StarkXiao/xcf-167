@@ -463,7 +463,9 @@ export function playTypingSound(mood: MoodType = 'normal'): void {
     scared: 600,
     calm: 500,
     whisper: 400,
-    urgent: 1000
+    urgent: 1000,
+    mystery: 550,
+    terrified: 450
   };
   const volMap: Record<MoodType, number> = {
     normal: 0.05,
@@ -471,7 +473,9 @@ export function playTypingSound(mood: MoodType = 'normal'): void {
     scared: 0.03,
     calm: 0.03,
     whisper: 0.02,
-    urgent: 0.08
+    urgent: 0.08,
+    mystery: 0.04,
+    terrified: 0.06
   };
   const ch = getChannelLevel();
   if (ch.audio >= 80 && Math.random() < (ch.audio - 80) / 40) return;
