@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { settings } from '../lib/store';
-  import { signalCorruption, getVisualArtifactChance } from '../lib/signalCorruption';
+  import { signalCorruption, getVisualArtifactChance, getChannelLevel } from '../lib/signalCorruption';
   import type { Danmaku } from '../types/game';
 
   export let danmakus: Danmaku[];
@@ -14,6 +14,8 @@
   $: danmakuSpeed = $settings.danmakuSpeed;
   $: corruptionLevel = $signalCorruption.level;
   $: artifactChance = getVisualArtifactChance(corruptionLevel);
+  $: channelLevel = getChannelLevel();
+  $: danmakuDegradation = channelLevel.danmaku;
 
   function getTrack(danmakuId: string, width: number): number {
     const now = Date.now();
@@ -37,13 +39,17 @@
 
   function getDanmakuStyle(d: Danmaku, track: number): string {
     const baseDuration = 8 / danmakuSpeed;
-    const duration = corruptionLevel > 40 ? baseDuration * (0.7 + Math.random() * 0.6) : baseDuration;
+    const effective = Math.max(corruptionLevel, danmakuDegradation);
+    const duration = effective > 40 ? baseDuration * (0.7 + Math.random() * 0.6) : baseDuration;
     const color = d.color || '#ffffff';
     let style = `top: calc(${track} * (100% / ${TRACK_COUNT}) + 5%); animation-duration: ${duration}s; color: ${color};`;
-    if (corruptionLevel > 50 && Math.random() < (corruptionLevel - 50) / 100) {
+    if (effective > 50 && Math.random() < (effective - 50) / 100) {
       const offsetX = (Math.random() - 0.5) * 20;
       const offsetY = (Math.random() - 0.5) * 10;
       style += ` transform: translate(${offsetX}px, ${offsetY}px);`;
+    }
+    if (danmakuDegradation > 80 && Math.random() < (danmakuDegradation - 80) / 40) {
+      style += ` opacity: 0.3;`;
     }
     return style;
   }
@@ -57,10 +63,11 @@
   <div 
     class="danmaku-layer" 
     bind:this={container}
-    class:corrupted={corruptionLevel >= 30}
-    class:heavily-corrupted={corruptionLevel >= 65}
+    class:corrupted={danmakuDegradation >= 30}
+    class:heavily-corrupted={danmakuDegradation >= 65}
+    class:communication-offline={danmakuDegradation >= 90}
   >
-    {#if corruptionLevel >= 40}
+    {#if danmakuDegradation >= 40}
       <div class="danmaku-noise-overlay"></div>
     {/if}
     {#each danmakus as d}
@@ -70,7 +77,7 @@
         style={getDanmakuStyle(d, track)}
         class:important={d.isImportant}
         class:backend-only={d.isBackendOnly}
-        class:glitched={corruptionLevel >= 45 && Math.random() < (corruptionLevel - 40) / 100}
+        class:glitched={danmakuDegradation >= 45 && Math.random() < (danmakuDegradation - 40) / 100}
       >
         <span class="dm-username">{d.username}:</span>
         <span class="dm-content">{d.content}</span>
@@ -136,6 +143,15 @@
   .danmaku-layer.heavily-corrupted {
     filter: contrast(1.25) saturate(0.6) hue-rotate(10deg);
     animation: danmakuLayerShake 0.3s infinite;
+  }
+
+  .danmaku-layer.communication-offline {
+    filter: contrast(1.4) saturate(0.3) brightness(0.6);
+    animation: danmakuLayerShake 0.15s infinite;
+  }
+
+  .danmaku-layer.communication-offline .danmaku-item {
+    opacity: 0.4;
   }
 
   .danmaku-noise-overlay {

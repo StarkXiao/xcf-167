@@ -5,7 +5,7 @@
   import { playSFX, playTypingSound, playBGM } from '../lib/audio';
   import type { DialogueLine, AudioTrigger, MoodType } from '../types/game';
   import { getEffectiveDialogue } from '../lib/engine';
-  import { signalCorruption, glitchSubtitleText } from '../lib/signalCorruption';
+  import { signalCorruption, glitchSubtitleText, getChannelLevel } from '../lib/signalCorruption';
   import { get } from 'svelte/store';
   import { currentPlaythrough } from '../lib/memory';
 
@@ -33,6 +33,9 @@
 
   $: textSpeed = $settings.textSpeed;
   $: corruptionLevel = $signalCorruption.level;
+  $: channelLevel = getChannelLevel();
+  $: visualDegradation = channelLevel.visual;
+  $: powerDegradation = channelLevel.power;
 
   function getCharDelay(mood?: MoodType, baseSpeed?: number, isBackendOnly?: boolean): number {
     const base = baseSpeed !== undefined
@@ -241,15 +244,18 @@
   role="button" 
   tabindex="0" 
   on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
-  class:corrupted-mild={corruptionLevel >= 20 && corruptionLevel < 45}
-  class:corrupted-moderate={corruptionLevel >= 45 && corruptionLevel < 70}
-  class:corrupted-severe={corruptionLevel >= 70}
+  class:corrupted-mild={visualDegradation >= 20 && visualDegradation < 45}
+  class:corrupted-moderate={visualDegradation >= 45 && visualDegradation < 70}
+  class:corrupted-severe={visualDegradation >= 70}
 >
-  {#if corruptionLevel >= 30}
+  {#if visualDegradation >= 30}
     <div class="corruption-overlay"></div>
   {/if}
-  {#if corruptionLevel >= 60}
+  {#if visualDegradation >= 60}
     <div class="scanlines"></div>
+  {/if}
+  {#if powerDegradation >= 60}
+    <div class="power-flicker"></div>
   {/if}
   {#if dialogue}
       {#if dialogue.speaker}
@@ -576,5 +582,24 @@
       font-size: 0.9rem;
       line-height: 1.7;
     }
+  }
+
+  .power-flicker {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 7;
+    animation: powerFlicker 0.15s infinite;
+  }
+
+  @keyframes powerFlicker {
+    0%, 100% { background: rgba(0, 0, 0, 0); }
+    10% { background: rgba(0, 0, 0, 0.3); }
+    30% { background: rgba(0, 0, 0, 0); }
+    50% { background: rgba(0, 0, 0, 0.5); }
+    70% { background: rgba(0, 0, 0, 0.1); }
+    90% { background: rgba(0, 0, 0, 0.4); }
   }
 </style>

@@ -1,4 +1,4 @@
-import type { StoryNode, Ending, Danmaku, DialogueLine } from '../types/game';
+import type { StoryNode, Ending, Danmaku, DialogueLine, DamageEffect, RepairEffect } from '../types/game';
 
 const mkDanmaku = (
   id: string,
@@ -328,6 +328,10 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d20', '灵异爱好者', '来了来了，我就知道', 1200, 6, 800, '#cc99ff'),
       mkDanmaku('d21', '不信邪', '哪呢哪呢？我怎么没看见', 2000, 7, 300),
       mkDanmaku('d22', '深海恐惧症', '我有点受不了了...', 2800, 7, 1000, '#9999ff')
+    ],
+    damageEffects: [
+      { system: 'sonar', damage: 15, message: '声呐系统检测到异常回波' },
+      { system: 'hull', damage: 10, message: '船体轻微形变' }
     ]
   },
   {
@@ -448,6 +452,11 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d26', '我是谁我在哪', '我在做梦对吧？这不可能是真的', 1500, 5, 300, '#ffffff'),
       mkDanmaku('d27', '阿海铁粉', '阿海快跑！！！', 2000, 5, 1200, '#ff6666', true),
       mkDanmaku('d28', '内部人士', '那个编号...深渊号不是三年前就退役了吗？', 2800, 6, 500, '#99ffff', true)
+    ],
+    damageEffects: [
+      { system: 'sonar', damage: 25, message: '声呐系统遭受强干扰' },
+      { system: 'camera', damage: 15, message: '摄像系统信号不稳定' },
+      { system: 'communication', damage: 10, message: '通信模块出现杂讯' }
     ]
   },
   {
@@ -621,6 +630,10 @@ export const nodes: StoryNode[] = [
       mkDanmaku('d31', '合同工', '打工人的痛，合同大于命', 1200, 7, 200, '#cccccc'),
       mkDanmaku('d32', '预言家', '如果关掉直播，他们就都活下来了。', 2000, 8, 300, '#ffffff', true),
       mkDanmaku('d33', '反预言家', '如果关直播才是死局呢？', 2800, 9, 100, '#ff0000', true)
+    ],
+    damageEffects: [
+      { system: 'communication', damage: 20, message: '通信模块受到电磁干扰' },
+      { system: 'control', damage: 10, message: '操控面板响应延迟' }
     ]
   },
   {
@@ -942,6 +955,11 @@ export const nodes: StoryNode[] = [
     ],
     nextNodeId: 'live_continue',
     effects: { hull_damaged: true },
+    damageEffects: [
+      { system: 'hull', damage: 35, message: '舱体外壳严重受损！03号舱泄漏！' },
+      { system: 'camera', damage: 25, message: '摄像镜头剧烈晃动' },
+      { system: 'power', damage: 15, message: '动力系统电压不稳' }
+    ],
     danmakus: [
       mkDanmaku('d34', '系统消息', '该内容已被管理员删除', 0, 8, 0, '#888888'),
       mkDanmaku('d35', '系统消息', '该内容已被管理员删除', 500, 8, 400, '#888888'),
@@ -981,6 +999,12 @@ export const nodes: StoryNode[] = [
       })
     ],
     effects: { saw_eye: true },
+    damageEffects: [
+      { system: 'communication', damage: 30, message: '通信模块严重过载！弹幕通道堵塞！' },
+      { system: 'camera', damage: 20, message: '摄像系统对焦失败' },
+      { system: 'sonar', damage: 20, message: '声呐数据异常' },
+      { system: 'control', damage: 15, message: '操控面板按键失灵' }
+    ],
     nextNodeBranches: [
       {
         nextNodeId: 'live_truth_branch',
@@ -1124,7 +1148,12 @@ export const nodes: StoryNode[] = [
         mood: 'scared'
       })
     ],
-    nextNodeId: 'ending_resolve_live'
+    nextNodeId: 'ending_resolve_live',
+    damageEffects: [
+      { system: 'power', damage: 40, message: '动力核心输出骤降！' },
+      { system: 'communication', damage: 25, message: '通信即将中断...' },
+      { system: 'hull', damage: 15, message: '船体结构性崩溃' }
+    ]
   },
   {
     id: 'ending_resolve_live',
@@ -1153,7 +1182,12 @@ export const nodes: StoryNode[] = [
     isEnding: true,
     endingId: 'ending_truth',
     endingTitle: '深海真相',
-    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。'
+    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。',
+    repairEffects: [
+      { system: 'camera', amount: 30 },
+      { system: 'communication', amount: 30 },
+      { system: 'sonar', amount: 30 }
+    ]
   },
   {
     id: 'ending_madness_node',
@@ -1229,7 +1263,11 @@ export const nodes: StoryNode[] = [
       })
     ],
     nextNodeId: 'stop_continue',
-    effects: { protocol_07: true }
+    effects: { protocol_07: true },
+    repairEffects: [
+      { system: 'sonar', amount: 10, message: '声呐干扰减弱' },
+      { system: 'communication', amount: 10, message: '通信模块尝试重新连接' }
+    ]
   },
   {
     id: 'stop_continue',
@@ -1423,7 +1461,15 @@ export const nodes: StoryNode[] = [
     isEnding: true,
     endingId: 'ending_survival',
     endingTitle: '幸存者',
-    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。'
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
   },
   {
     id: 'ending_loop_stop',
@@ -1511,7 +1557,15 @@ export const nodes: StoryNode[] = [
     isEnding: true,
     endingId: 'ending_survival',
     endingTitle: '幸存者',
-    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。'
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
   },
   {
     id: 'ending_loop',
@@ -1589,7 +1643,12 @@ export const nodes: StoryNode[] = [
       })
     ],
     nextNodeId: 'ascent_ending',
-    effects: { fast_ascent: true }
+    effects: { fast_ascent: true },
+    damageEffects: [
+      { system: 'hull', damage: 25, message: '紧急上浮导致舱体压力剧增' },
+      { system: 'sonar', damage: 15, message: '声呐因压力变化暂时失灵' },
+      { system: 'power', damage: 20, message: '推进器过载运行' }
+    ]
   },
   {
     id: 'ascent_ending',
@@ -1625,7 +1684,11 @@ export const nodes: StoryNode[] = [
         mood: 'calm'
       })
     ],
-    nextNodeId: 'ending_resolve_ascent'
+    nextNodeId: 'ending_resolve_ascent',
+    repairEffects: [
+      { system: 'camera', amount: 15, message: '摄像系统逐步恢复' },
+      { system: 'communication', amount: 10, message: '通信信号逐渐增强' }
+    ]
   },
   {
     id: 'ending_resolve_ascent',
@@ -1654,7 +1717,15 @@ export const nodes: StoryNode[] = [
     isEnding: true,
     endingId: 'ending_survival',
     endingTitle: '幸存者',
-    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。'
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
   },
   {
     id: 'ending_truth_ascent',
@@ -1673,7 +1744,15 @@ export const nodes: StoryNode[] = [
     isEnding: true,
     endingId: 'ending_truth',
     endingTitle: '深海真相',
-    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。'
+    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。',
+    repairEffects: [
+      { system: 'hull', amount: 40 },
+      { system: 'camera', amount: 40 },
+      { system: 'communication', amount: 40 },
+      { system: 'sonar', amount: 40 },
+      { system: 'control', amount: 40 },
+      { system: 'power', amount: 40 }
+    ]
   },
   {
     id: 'ending_silence',

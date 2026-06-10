@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { signalCorruption, getVisualArtifactChance } from '../lib/signalCorruption';
+  import { signalCorruption, getVisualArtifactChance, getChannelLevel } from '../lib/signalCorruption';
 
   export let background: string = 'default';
 
   $: bgStyle = getBackgroundStyle(background);
   $: corruptionLevel = $signalCorruption.level;
-  $: showCorruption = corruptionLevel >= 20;
-  $: showHeavyCorruption = corruptionLevel >= 55;
-  $: showCriticalCorruption = corruptionLevel >= 80;
+  $: channelLevel = getChannelLevel();
+  $: visualDegradation = channelLevel.visual;
+  $: powerDegradation = channelLevel.power;
+  $: showCorruption = visualDegradation >= 20;
+  $: showHeavyCorruption = visualDegradation >= 55;
+  $: showCriticalCorruption = visualDegradation >= 80;
 
   function getBackgroundStyle(bg: string): string {
     const styles: Record<string, string> = {
@@ -69,6 +72,9 @@
       {/each}
     </div>
     <div class="corruption-tear" class:visible={Math.random() < 0.3}></div>
+  {/if}
+  {#if powerDegradation >= 40}
+    <div class="power-blackout" style="--power-intensity: {powerDegradation / 100}"></div>
   {/if}
 </div>
 
@@ -248,5 +254,24 @@
     10% { opacity: 1; }
     90% { opacity: 1; }
     100% { left: 105%; opacity: 0; }
+  }
+
+  .power-blackout {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    background: rgba(0, 0, 0, 0);
+    animation: powerBlackout 0.2s infinite;
+  }
+
+  @keyframes powerBlackout {
+    0%, 100% { background: rgba(0, 0, 0, 0); }
+    15% { background: rgba(0, 0, 0, calc(var(--power-intensity) * 0.6)); }
+    25% { background: rgba(0, 0, 0, 0); }
+    45% { background: rgba(0, 0, 0, calc(var(--power-intensity) * 0.4)); }
+    55% { background: rgba(0, 0, 0, 0); }
+    75% { background: rgba(0, 0, 0, calc(var(--power-intensity) * 0.7)); }
+    85% { background: rgba(0, 0, 0, 0); }
   }
 </style>

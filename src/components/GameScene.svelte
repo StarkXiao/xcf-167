@@ -58,6 +58,16 @@
     signalCorruption,
     corruptionSeverity
   } from '../lib/signalCorruption';
+  import {
+    initHullDamage,
+    destroyHullDamage,
+    resetHullDamage,
+    hullDamage,
+    channelDegradation,
+    overallIntegrity,
+    activeAlerts,
+    dismissAlert
+  } from '../lib/hullDamage';
   import { resetTrustState } from '../lib/trust';
   import {
     rewindState,
@@ -199,49 +209,9 @@
   }
 
   function applyNodeCorruption(node: StoryNode) {
-    const bgCorruptionMap: Record<string, number> = {
-      tense: 40,
-      damage: 55,
-      dark: 30,
-      creature: 35,
-      glitch: 65,
-      escape: 20,
-      ascent: 10
-    };
-    
-    let target = 0;
-    if (node.background && bgCorruptionMap[node.background] !== undefined) {
-      target = bgCorruptionMap[node.background];
-    }
-    
-    if (node.isEnding) {
-      if (node.endingId === 'ending_madness' || node.endingId === 'ending_silence') {
-        target = Math.max(target, 75);
-      } else if (node.endingId === 'ending_loop') {
-        target = Math.max(target, 60);
-      } else {
-        target = Math.min(target, 15);
-      }
-    }
-    
-    setCorruptionTarget(target);
   }
 
   function applyVariableCorruption(variables: Record<string, string | number | boolean>) {
-    let bonus = 0;
-    if (variables.signal_unstable === true) bonus += 25;
-    if (variables.creature_nearby === true) bonus += 20;
-    if (variables.damage_hull === true) bonus += 30;
-    if (variables.protocol_breach === true) bonus += 35;
-    if (variables.full_truth === true) bonus += 40;
-    if (variables.sanity_low === true) bonus += 30;
-    
-    if (bonus > 0) {
-      const current = get(signalCorruption).targetLevel;
-      if (current < bonus) {
-        setCorruptionTarget(bonus);
-      }
-    }
   }
 
   function handleDialogueComplete() {
@@ -364,6 +334,7 @@
     restoreAnonymousSenderState(slot.state.anonymousSenderState);
     resetEvidenceBoard();
     resetCorruption();
+    resetHullDamage();
     resetTrustState();
     resetRewindState();
     isEnding = false;
@@ -394,6 +365,7 @@
     resetAnonymousSenderState();
     resetEvidenceBoard();
     resetCorruption();
+    resetHullDamage();
     resetTrustState();
     resetRewindState();
     isEnding = false;
@@ -444,8 +416,10 @@
     initAudio();
     resumeAudio();
     initSignalCorruption();
+    initHullDamage();
     resetEvidenceBoard();
     resetCorruption();
+    resetHullDamage();
     const initialState = get(gameState);
     if (initialState.anonymousSenderState) {
       restoreAnonymousSenderState(initialState.anonymousSenderState);
@@ -462,6 +436,7 @@
 
   onDestroy(() => {
     destroySignalCorruption();
+    destroyHullDamage();
     clearDanmakuTimeouts();
     clearPendingTriggers();
     stopBGM();
@@ -594,6 +569,33 @@
       </div>
       <span class="stability-text">{$rewindState.stability}</span>
     </div>
+    {#if $overallIntegrity < 95}
+      <div class="hull-integrity-indicator" class:integrity-critical={$overallIntegrity < 30} class:integrity-damaged={$overallIntegrity < 60}>
+        <span class="integrity-icon">🛡</span>
+        <div class="integrity-bar-wrap">
+          <div class="integrity-bar" style="width: {$overallIntegrity}%"></div>
+        </div>
+        <span class="integrity-text">{Math.round($overallIntegrity)}%</span>
+      </div>
+    {/if}
+    {#if $activeAlerts.length > 0}
+      <div class="damage-alerts">
+        {#each $activeAlerts as alert (alert.id)}
+          <div 
+            class="damage-alert"
+            class:alert-warning={alert.severity === 'warning'}
+            class:alert-critical={alert.severity === 'critical'}
+            class:alert-offline={alert.severity === 'offline'}
+            on:click|stopPropagation={() => dismissAlert(alert.id)}
+          >
+            <span class="alert-icon">
+              {#if alert.severity === 'offline'}✕{:else if alert.severity === 'critical'}⚠{:else}⚡{/if}
+            </span>
+            <span class="alert-text">{alert.message}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
   <GameMenu 
@@ -1126,6 +1128,130 @@
     color: #a0e8ff;
     min-width: 22px;
     text-align: right;
+  }
+
+  .hull-integrity-indicator {
+    position: absolute;
+    top: calc(56px + env(safe-area-inset-top));
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(10, 20, 40, 0.65);
+    border: 1px solid rgba(100, 200, 255, 0.25);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    z-index: 35;
+    font-family: 'Courier New', monospace;
+  }
+
+  .integrity-icon {
+    font-size: 0.85rem;
+  }
+
+  .integrity-bar-wrap {
+    width: 60px;
+    height: 6px;
+    background: rgba(50, 50, 80, 0.6);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .integrity-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #64d8ff, #64ff96);
+    border-radius: 3px;
+    transition: width 0.4s ease, background 0.4s ease;
+  }
+
+  .hull-integrity-indicator.integrity-damaged .integrity-bar {
+    background: linear-gradient(90deg, #ffd864, #ff9650);
+  }
+
+  .hull-integrity-indicator.integrity-critical .integrity-bar {
+    background: linear-gradient(90deg, #ff3030, #ff0060);
+    animation: criticalBlink 0.5s infinite;
+  }
+
+  .integrity-text {
+    font-size: 0.7rem;
+    color: #a0e8ff;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  .hull-integrity-indicator.integrity-damaged .integrity-text {
+    color: #ffc864;
+  }
+
+  .hull-integrity-indicator.integrity-critical .integrity-text {
+    color: #ff5070;
+  }
+
+  .damage-alerts {
+    position: absolute;
+    top: calc(88px + env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 36;
+    pointer-events: none;
+  }
+
+  .damage-alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-family: 'Courier New', monospace;
+    backdrop-filter: blur(8px);
+    animation: alertSlideIn 0.3s ease-out;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .damage-alert.alert-warning {
+    background: rgba(255, 200, 100, 0.15);
+    border: 1px solid rgba(255, 200, 100, 0.4);
+    color: #ffc864;
+  }
+
+  .damage-alert.alert-critical {
+    background: rgba(255, 100, 100, 0.18);
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    color: #ff8080;
+    animation: alertSlideIn 0.3s ease-out, criticalPulse 0.6s infinite;
+  }
+
+  .damage-alert.alert-offline {
+    background: rgba(255, 50, 80, 0.22);
+    border: 1px solid rgba(255, 50, 80, 0.6);
+    color: #ff5070;
+    animation: alertSlideIn 0.3s ease-out, criticalPulse 0.3s infinite;
+  }
+
+  .alert-icon {
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+
+  .alert-text {
+    letter-spacing: 0.05em;
+  }
+
+  @keyframes alertSlideIn {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes criticalPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
   }
 
   .rewind-panel-backdrop {

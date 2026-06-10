@@ -3,7 +3,7 @@
   import type { Choice, CrewMemberId } from '../types/game';
   import { getChoiceDisplayText } from '../lib/engine';
   import { checkMemoryCondition } from '../lib/memory';
-  import { signalCorruption, shouldHideChoice, glitchChoiceText, shouldScrambleChoices, getCurrentCorruption } from '../lib/signalCorruption';
+  import { signalCorruption, shouldHideChoice, glitchChoiceText, shouldScrambleChoices, getCurrentCorruption, getChannelLevel } from '../lib/signalCorruption';
   import { getCrewMember } from '../lib/trust';
   import { get } from 'svelte/store';
 
@@ -11,6 +11,8 @@
   export let onSelect: (choiceId: string) => void;
 
   $: corruptionLevel = $signalCorruption.level;
+  $: channelLevel = getChannelLevel();
+  $: controlDegradation = channelLevel.control;
   $: processedChoices = processChoices(choices);
 
   function processChoices(inputChoices: Choice[]): { choice: Choice; displayText: string; visible: boolean; isMemory: boolean; glitchSeed: number; trustPreview?: { positive: number; negative: number; hint?: string } }[] {
@@ -59,10 +61,11 @@
 <div 
   class="choices-container" 
   style="animation: fadeInUp 0.4s ease-out;"
-  class:corrupted={corruptionLevel >= 30}
-  class:heavily-corrupted={corruptionLevel >= 60}
+  class:corrupted={controlDegradation >= 30}
+  class:heavily-corrupted={controlDegradation >= 60}
+  class:control-offline={controlDegradation >= 85}
 >
-  {#if corruptionLevel >= 25}
+  {#if controlDegradation >= 25}
     <div class="choices-noise"></div>
   {/if}
   <div class="choices-title" class:title-glitch={corruptionLevel >= 45}>
@@ -74,19 +77,19 @@
         <button 
           class="choice-btn"
           class:memory-choice={item.isMemory}
-          class:btn-glitched={corruptionLevel >= 40 && Math.random() < (corruptionLevel - 35) / 100}
+          class:btn-glitched={controlDegradation >= 40 && Math.random() < (controlDegradation - 35) / 100}
           on:click={() => handleSelect(item)}
           style="animation-delay: {i * 0.1}s"
         >
           <span class="choice-index" class:memory-index={item.isMemory}>{i + 1}</span>
           <span class="choice-text">
-            {corruptionLevel >= 30 ? glitchChoiceText(item.displayText, corruptionLevel * 0.8) : item.displayText}
+            {controlDegradation >= 30 ? glitchChoiceText(item.displayText, controlDegradation * 0.8) : item.displayText}
             {#if item.isMemory}
               <span class="memory-choice-tag">
                 {corruptionLevel >= 50 ? glitchChoiceText('新选项', corruptionLevel * 0.5) : '新选项'}
               </span>
             {/if}
-            {#if item.trustPreview && corruptionLevel < 40}
+            {#if item.trustPreview && controlDegradation < 40}
               <span class="trust-preview">
                 {#if item.trustPreview.positive > 0}
                   <span class="trust-preview-positive">+{item.trustPreview.positive} 信任</span>
@@ -106,15 +109,20 @@
         >
           <span class="choice-index">?</span>
           <span class="choice-text">
-            {corruptionLevel >= 60 ? glitchChoiceText('████████████████████', corruptionLevel) : '— 信号丢失 —'}
+            {controlDegradation >= 60 ? glitchChoiceText('████████████████████', controlDegradation) : '— 信号丢失 —'}
           </span>
         </button>
       {/if}
     {/each}
   </div>
-  {#if corruptionLevel >= 50}
+  {#if controlDegradation >= 50}
     <div class="choice-warning">
-      ⚠ 信号干扰：部分选项可能无法正常显示
+      ⚠ 操控系统受损：部分选项可能无法正常操作
+    </div>
+  {/if}
+  {#if controlDegradation >= 85}
+    <div class="choice-offline-warning">
+      ✕ 操控面板严重故障 — 系统尝试降级运行
     </div>
   {/if}
 </div>
@@ -258,6 +266,11 @@
     animation: choicesShake 0.4s infinite;
   }
 
+  .choices-container.control-offline {
+    filter: contrast(1.35) saturate(0.4) brightness(0.7) hue-rotate(-15deg);
+    animation: choicesShake 0.15s infinite;
+  }
+
   .choices-noise {
     position: absolute;
     inset: 0;
@@ -336,6 +349,16 @@
   @keyframes warningBlink {
     0%, 100% { opacity: 0.9; }
     50% { opacity: 0.5; }
+  }
+
+  .choice-offline-warning {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: rgba(255, 80, 80, 0.95);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.05em;
+    animation: warningBlink 0.5s infinite;
   }
 
   @media (max-width: 480px) {

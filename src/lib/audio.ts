@@ -1,5 +1,5 @@
 import type { SFXType, BGMType, MoodType } from '../types/game';
-import { signalCorruption, getAudioDistortionParams } from './signalCorruption';
+import { signalCorruption, getAudioDistortionParams, getChannelLevel } from './signalCorruption';
 import { get } from 'svelte/store';
 import { logTriggeredSfx, getActiveRewindEffect, getSfxOverride } from './timeRewind';
 
@@ -62,7 +62,9 @@ function startCorruptionAudioUpdate(): void {
   corruptionUpdateTimer = window.setInterval(() => {
     if (!audioContext || !bgmGain) return;
     const corruptionLevel = get(signalCorruption).level;
-    const params = getAudioDistortionParams(corruptionLevel);
+    const ch = getChannelLevel();
+    const effectiveAudio = Math.max(corruptionLevel, ch.audio);
+    const params = getAudioDistortionParams(effectiveAudio);
     const ctx = audioContext;
     
     if (bgmFilter) {
@@ -71,6 +73,13 @@ function startCorruptionAudioUpdate(): void {
     
     if (bgmNoiseGain) {
       bgmNoiseGain.gain.setValueAtTime(muted ? 0 : params.noiseAmount, ctx.currentTime);
+    }
+    
+    if (ch.audio >= 70 && bgmGain) {
+      const blackoutGain = 1 - (ch.audio - 70) / 100;
+      bgmGain.gain.setValueAtTime(Math.max(0.15, blackoutGain), ctx.currentTime);
+    } else if (bgmGain) {
+      bgmGain.gain.setValueAtTime(muted ? 0 : 0.5, ctx.currentTime);
     }
     
     bgmNodes.forEach(({ osc, lfo, lfoGain }, i) => {
@@ -83,7 +92,7 @@ function startCorruptionAudioUpdate(): void {
         lfoGain.gain.setValueAtTime(0.024 + params.lfoDepth * 0.05, ctx.currentTime);
       }
       osc.detune.setValueAtTime(
-        params.pitchShift + Math.sin(Date.now() / 500 + i) * corruptionLevel * 0.05, 
+        params.pitchShift + Math.sin(Date.now() / 500 + i) * effectiveAudio * 0.05, 
         ctx.currentTime
       );
     });
@@ -211,8 +220,22 @@ export function playSFX(type: SFXType, customVolume?: number): void {
   if (!audioContext || !sfxGain) return;
 
   logTriggeredSfx(type);
-  
-  const vol = customVolume !== undefined ? customVolume : 1;
+
+  const ch = getChannelLevel();
+  const sonarDegradation = ch.audio;
+
+  if (sonarDegradation >= 85) {
+    if (type === 'sonar' || type === 'bubbles' || type === 'water_drip') return;
+    if (Math.random() < (sonarDegradation - 85) / 30) return;
+  }
+
+  let vol = customVolume !== undefined ? customVolume : 1;
+  if (sonarDegradation > 30) {
+    const sonarDampen = 1 - (sonarDegradation - 30) / 140;
+    vol *= Math.max(0.2, sonarDampen);
+    if (type === 'sonar') vol *= 0.5;
+  }
+
   _playSFXInternal(type, vol);
 }
 
@@ -450,11 +473,14 @@ export function playTypingSound(mood: MoodType = 'normal'): void {
     whisper: 0.02,
     urgent: 0.08
   };
+  const ch = getChannelLevel();
+  if (ch.audio >= 80 && Math.random() < (ch.audio - 80) / 40) return;
+  const audioDampen = ch.audio > 40 ? 1 - (ch.audio - 40) / 120 : 1;
   playTone(
     freqMap[mood] || 700,
     0.015,
     'square',
-    volMap[mood] || 0.05,
+    (volMap[mood] || 0.05) * Math.max(0.2, audioDampen),
     getSafeAudioTime()
   );
 }

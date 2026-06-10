@@ -116,6 +116,8 @@ export interface StoryNode {
   memoryHints?: AudioHint[];
   isRewindCheckpoint?: boolean;
   rewindCheckpointLabel?: string;
+  damageEffects?: DamageEffect[];
+  repairEffects?: RepairEffect[];
 }
 
 export interface Ending {
@@ -265,11 +267,64 @@ export interface GlobalMemory {
   updatedAt: number;
 }
 
+export type SubmarineSystem = 'hull' | 'camera' | 'communication' | 'sonar' | 'control' | 'power';
+
+export const SUBMARINE_SYSTEM_LABELS: Record<SubmarineSystem, string> = {
+  hull: '舱体外壳',
+  camera: '摄像系统',
+  communication: '通信模块',
+  sonar: '声呐系统',
+  control: '操控面板',
+  power: '动力核心'
+};
+
+export interface SystemDamageState {
+  damage: number;
+  targetDamage: number;
+  lastUpdate: number;
+}
+
+export interface DamageAlert {
+  system: SubmarineSystem;
+  message: string;
+  timestamp: number;
+  severity: 'warning' | 'critical' | 'offline';
+  id: string;
+}
+
+export interface HullDamageState {
+  systems: Record<SubmarineSystem, SystemDamageState>;
+  alerts: DamageAlert[];
+  alertIdCounter: number;
+}
+
+export interface DamageEffect {
+  system: SubmarineSystem;
+  damage: number;
+  message?: string;
+}
+
+export interface RepairEffect {
+  system: SubmarineSystem;
+  amount: number;
+  message?: string;
+}
+
+export interface ChannelDegradation {
+  visual: number;
+  danmaku: number;
+  audio: number;
+  control: number;
+  power: number;
+  combined: number;
+}
+
 export interface SignalCorruptionState {
   level: number;
   targetLevel: number;
   lastUpdate: number;
   fluctuation: number;
+  channelDegradation: ChannelDegradation;
 }
 
 export interface CorruptionEffect {
