@@ -5,20 +5,25 @@
     chaptersWithStatus,
     getChapterRecords,
     getVariableDiff,
-    clearChapterRecords
+    clearChapterRecords,
+    getChapterSaves,
+    deleteChapterSave
   } from '../lib/chapterReview';
   import { globalMemory, unlockedClueList } from '../lib/memory';
   import { getAllEndings } from '../lib/engine';
-  import type { ChapterDefinition, ChapterPlayRecord } from '../types/game';
+  import type { ChapterDefinition, ChapterPlayRecord, ChapterSaveSlot } from '../types/game';
 
   export let isOpen: boolean;
   export let onClose: () => void;
   export let onReplayChapter: (chapter: ChapterDefinition) => void;
+  export let onLoadChapterSave: ((slot: ChapterSaveSlot) => void) | undefined = undefined;
 
   const allEndings = getAllEndings();
 
   type ViewState = 'chapters' | 'review' | 'comparison';
+  type ChapterTab = 'records' | 'saves';
   let viewState: ViewState = 'chapters';
+  let chapterTab: ChapterTab = 'records';
   let selectedChapterId: string | null = null;
   let selectedRecord: ChapterPlayRecord | null = null;
 
@@ -40,6 +45,7 @@
   function backToChapters() {
     playSFX('click');
     viewState = 'chapters';
+    chapterTab = 'records';
     selectedChapterId = null;
     selectedRecord = null;
   }
@@ -58,6 +64,7 @@
   function handleClose() {
     playSFX('click');
     viewState = 'chapters';
+    chapterTab = 'records';
     selectedChapterId = null;
     selectedRecord = null;
     onClose();
@@ -69,13 +76,24 @@
     handleClose();
   }
 
-  function handleClearRecords(chapterId: string) {
+  function handleLoadSave(slot: ChapterSaveSlot) {
+    playSFX('select');
+    if (onLoadChapterSave) {
+      onLoadChapterSave(slot);
+    }
+    handleClose();
+  }
+
+  function handleClearRecords() {
+    if (!currentChapter) return;
     playSFX('click');
-    clearChapterRecords(chapterId);
+    clearChapterRecords(currentChapter.id);
   }
 
   $: currentChapter = selectedChapterId ? getChapterDef(selectedChapterId) : null;
+  $: currentChapterId = currentChapter?.id || '';
   $: currentRecords = selectedChapterId ? getChapterRecords(selectedChapterId) : [];
+  $: currentSaves = currentChapterId ? getChapterSaves(currentChapterId) : [];
   $: variableDiff = selectedRecord
     ? getVariableDiff(selectedRecord.variablesBefore, selectedRecord.variablesAfter)
     : [];
@@ -169,11 +187,27 @@
         <p class="chapter-desc review-desc">{currentChapter.description}</p>
 
         {#if !selectedRecord}
+          <div class="chapter-tab-bar">
+            <button class="chapter-tab {chapterTab === 'records' ? 'active' : ''}" on:click={() => { chapterTab = 'records'; playSFX('click'); }}>
+              📋 复盘记录
+              {#if currentRecords.length > 0}
+                <span class="tab-count">{currentRecords.length}</span>
+              {/if}
+            </button>
+            <button class="chapter-tab {chapterTab === 'saves' ? 'active' : ''}" on:click={() => { chapterTab = 'saves'; playSFX('click'); }}>
+              💾 章节存档
+              {#if currentSaves.length > 0}
+                <span class="tab-count">{currentSaves.length}</span>
+              {/if}
+            </button>
+          </div>
+
+          {#if chapterTab === 'records'}
           <div class="records-section">
             <div class="section-header">
               <h3 class="section-title">复盘记录</h3>
               {#if currentRecords.length > 0}
-                <button class="clear-btn" on:click={() => handleClearRecords(currentChapter!.id)}>清空记录</button>
+                <button class="clear-btn" on:click={handleClearRecords}>清空记录</button>
               {/if}
             </div>
 
@@ -201,6 +235,49 @@
               </div>
             {/if}
           </div>
+          {:else if chapterTab === 'saves'}
+          <div class="saves-section">
+            <div class="section-header">
+              <h3 class="section-title">章节存档</h3>
+            </div>
+
+            {#if currentSaves.length === 0}
+              <div class="empty-state">
+                <p>暂无章节存档</p>
+                <p class="empty-hint">在章节重播过程中点击💾按钮可保存进度</p>
+              </div>
+            {:else}
+              <div class="save-list">
+                {#each currentSaves as save (save.id)}
+                  <div class="save-item-card">
+                    <div class="save-item-preview">{save.preview}</div>
+                    <div class="save-item-meta">
+                      <span class="save-item-time">{new Date(save.savedAt).toLocaleString('zh-CN')}</span>
+                      <span class="save-item-node">节点: {save.nodeId}</span>
+                      <span class="save-item-dialogue">对话: {save.dialogueIndex}</span>
+                    </div>
+                    <div class="save-item-actions">
+                      {#if onLoadChapterSave}
+                        <button class="save-item-btn load" on:click={() => handleLoadSave(save)}>
+                          ▶ 加载
+                        </button>
+                      {/if}
+                      <button 
+                        class="save-item-btn delete" 
+                        on:click={() => {
+                          playSFX('click');
+                          deleteChapterSave(save.chapterId, save.id);
+                        }}
+                      >
+                        ✕ 删除
+                      </button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+          {/if}
 
         {:else}
           <div class="detail-section">
@@ -970,5 +1047,127 @@
       flex-wrap: wrap;
       gap: 6px;
     }
+  }
+
+  .chapter-tab-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border: 1px solid rgba(100, 180, 255, 0.2);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .chapter-tab {
+    flex: 1;
+    padding: 10px;
+    background: rgba(30, 55, 90, 0.4);
+    border: none;
+    color: #6a8aaa;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .chapter-tab.active {
+    background: rgba(60, 120, 200, 0.4);
+    color: #c0d8f0;
+  }
+
+  .chapter-tab:not(.active):hover {
+    background: rgba(40, 70, 110, 0.5);
+  }
+
+  .tab-count {
+    font-size: 0.7rem;
+    background: rgba(100, 180, 255, 0.2);
+    padding: 1px 6px;
+    border-radius: 8px;
+    color: #8ab0d0;
+  }
+
+  .chapter-tab.active .tab-count {
+    background: rgba(100, 180, 255, 0.3);
+    color: #c0d8f0;
+  }
+
+  .saves-section {
+    margin-bottom: 20px;
+  }
+
+  .save-item-card {
+    padding: 14px;
+    background: rgba(25, 45, 75, 0.5);
+    border: 1px solid rgba(150, 120, 220, 0.2);
+    border-left: 3px solid #c0a8ff;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+  }
+
+  .save-item-card:hover {
+    background: rgba(40, 65, 105, 0.5);
+    border-color: rgba(150, 120, 220, 0.4);
+  }
+
+  .save-item-preview {
+    color: #d0e4f8;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    min-height: 2.5em;
+  }
+
+  .save-item-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .save-item-time,
+  .save-item-node,
+  .save-item-dialogue {
+    font-size: 0.72rem;
+    color: #6a8aaa;
+    font-family: 'Courier New', monospace;
+  }
+
+  .save-item-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .save-item-btn {
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .save-item-btn.load {
+    background: linear-gradient(135deg, rgba(60, 120, 200, 0.6), rgba(40, 80, 160, 0.6));
+    border-color: rgba(100, 180, 255, 0.4);
+    color: #e0f0ff;
+  }
+
+  .save-item-btn.load:hover {
+    background: linear-gradient(135deg, rgba(70, 140, 220, 0.7), rgba(50, 100, 180, 0.7));
+  }
+
+  .save-item-btn.delete {
+    background: rgba(150, 60, 60, 0.2);
+    border-color: rgba(200, 80, 80, 0.3);
+    color: #d08080;
+  }
+
+  .save-item-btn.delete:hover {
+    background: rgba(180, 60, 60, 0.4);
   }
 </style>

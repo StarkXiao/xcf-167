@@ -88,12 +88,26 @@
     clearPendingTriggers,
     latestMessagePreview
   } from '../lib/anonymousSender';
+  import {
+    isInChapterReplay,
+    currentReplayChapterId,
+    getCurrentReplayChapter,
+    recordReplayNodeVisit,
+    recordReplayChoice,
+    createChapterSave,
+    getChapterSaves,
+    getCurrentReplayProgress,
+    deleteChapterSave
+  } from '../lib/chapterReview';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint } from '../types/game';
   import { getNode, rewindToCheckpoint } from '../lib/engine';
 
   export let onBackToMenu: () => void;
   export let onShowEndingsGallery: () => void;
   export let onShowChapterReview: () => void = () => {};
+  export let onNodeReached: ((nodeId: string) => void) | undefined = undefined;
+
+  let showChapterSavePanel = false;
 
   let currentNode: StoryNode | undefined;
   let currentDialogue: DialogueLine | null = null;
@@ -152,6 +166,10 @@
       syncEvidenceToMemory(currentNode.id);
       applyNodeCorruption(currentNode);
       lastNodeId = currentNode.id;
+      recordReplayNodeVisit(currentNode.id);
+      if (onNodeReached) {
+        onNodeReached(currentNode.id);
+      }
       if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
       }
@@ -264,6 +282,11 @@
   }
 
   function handleChoice(choiceId: string) {
+    const state = get(gameState);
+    const choice = availableChoices.find(c => c.id === choiceId);
+    if (choice && state.currentNodeId) {
+      recordReplayChoice(state.currentNodeId, choiceId, choice.text);
+    }
     selectChoice(choiceId);
     updateState();
   }
@@ -413,6 +436,27 @@
     return node?.title || nodeId;
   }
 
+  function handleSaveChapterGame() {
+    if (!$isInChapterReplay) return;
+    const state = get(gameState);
+    const chapter = getCurrentReplayChapter();
+    if (!chapter) return;
+
+    const preview = currentDialogue?.text || currentNode?.title || '';
+    createChapterSave(
+      chapter.id,
+      state.currentNodeId,
+      state.dialogueIndex,
+      state.variables,
+      preview
+    );
+    playSFX('notify');
+  }
+
+  function handleShowChapterSaves() {
+    showChapterSavePanel = !showChapterSavePanel;
+  }
+
   onMount(() => {
     initAudio();
     resumeAudio();
@@ -459,7 +503,12 @@
   {#if currentNode?.title}
     <div class="node-title-bar" style="animation: fadeIn 0.6s ease-out;">
       <span class="title-text">{currentNode.title}</span>
-      {#if $currentPlaythrough > 1}
+      {#if $isInChapterReplay}
+        <span class="chapter-replay-badge">
+          <span class="replay-icon">⟲</span>
+          章节重播: {getCurrentReplayChapter()?.title || ''}
+        </span>
+      {:else if $currentPlaythrough > 1}
         <span class="playthrough-badge">第 {$currentPlaythrough} 周目</span>
       {/if}
       {#if $signalCorruption.level >= 15}
@@ -564,6 +613,14 @@
     >
       ⏪
     </button>
+    {#if $isInChapterReplay}
+      <button 
+        class="chapter-save-toggle"
+        on:click|stopPropagation={() => { playSFX('select'); handleShowChapterSaves(); }}
+      >
+        💾
+      </button>
+    {/if}
     <div class="stability-indicator" class:stability-critical={$stabilityLevel === 'critical'} class:stability-unstable={$stabilityLevel === 'unstable'} class:stability-fragile={$stabilityLevel === 'fragile'}>
       <span class="stability-icon">◈</span>
       <div class="stability-bar-wrap">
@@ -695,6 +752,60 @@
 
   {#if $rewindState.isRewindMode}
     <div class="rewind-active-overlay"></div>
+  {/if}
+
+  {#if showChapterSavePanel && $isInChapterReplay}
+    <div class="chapter-save-backdrop" on:click|stopPropagation={() => { showChapterSavePanel = false; }}>
+      <div class="chapter-save-panel" on:click|stopPropagation>
+        <div class="panel-header">
+          <h3 class="panel-title">💾 章节存档</h3>
+          <button class="panel-close" on:click={() => { showChapterSavePanel = false; }}>✕</button>
+        </div>
+
+        <div class="save-actions">
+          <button class="save-new-btn" on:click={handleSaveChapterGame}>
+            <span class="save-icon">＋</span>
+            <span>保存当前进度</span>
+          </button>
+        </div>
+
+        <div class="save-list-header">
+          <h4 class="save-list-title">存档槽位</h4>
+          <span class="save-count">
+            {getChapterSaves($currentReplayChapterId || '').length} 个存档
+          </span>
+        </div>
+
+        <div class="save-list">
+          {#if getChapterSaves($currentReplayChapterId || '').length === 0}
+            <div class="no-saves">
+              <p>暂无存档</p>
+              <p class="no-saves-hint">点击上方按钮保存当前章节进度</p>
+            </div>
+          {:else}
+            {#each getChapterSaves($currentReplayChapterId || '') as save}
+              <div class="save-item">
+                <div class="save-info">
+                  <div class="save-preview">{save.preview}</div>
+                  <div class="save-meta">
+                    <span class="save-time">{new Date(save.savedAt).toLocaleString('zh-CN')}</span>
+                    <span class="save-node">节点: {save.nodeId}</span>
+                  </div>
+                </div>
+                <div class="save-actions-inline">
+                  <button 
+                    class="save-delete-btn" 
+                    on:click={() => deleteChapterSave(save.chapterId, save.id)}
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -1620,6 +1731,264 @@
     .rewind-checkpoints-list {
       padding-left: 14px;
       padding-right: 14px;
+    }
+  }
+
+  .chapter-replay-badge {
+    margin-left: 12px;
+    padding: 3px 12px;
+    background: linear-gradient(135deg, rgba(100, 200, 255, 0.15), rgba(60, 120, 200, 0.15));
+    border: 1px solid rgba(100, 200, 255, 0.4);
+    border-radius: 12px;
+    font-size: 0.72rem;
+    color: #80dcff;
+    font-family: 'Courier New', monospace;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    animation: replayPulse 2s infinite;
+  }
+
+  .replay-icon {
+    font-size: 0.8rem;
+  }
+
+  @keyframes replayPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .chapter-save-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 304px;
+    width: 40px;
+    height: 40px;
+    background: rgba(35, 25, 60, 0.6);
+    border: 1px solid rgba(200, 150, 255, 0.35);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    animation: saveGlow 2s infinite;
+  }
+
+  .chapter-save-toggle:hover {
+    background: rgba(60, 45, 100, 0.8);
+    border-color: rgba(200, 150, 255, 0.6);
+    box-shadow: 0 0 15px rgba(200, 150, 255, 0.3);
+  }
+
+  @keyframes saveGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(200, 150, 255, 0.2); }
+    50% { box-shadow: 0 0 12px rgba(200, 150, 255, 0.4); }
+  }
+
+  .chapter-save-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 5, 15, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 90;
+    backdrop-filter: blur(8px);
+    padding: 16px;
+    animation: fadeIn 0.25s ease-out;
+  }
+
+  .chapter-save-panel {
+    background: linear-gradient(180deg, rgba(15, 25, 50, 0.98), rgba(8, 15, 35, 1));
+    border: 1px solid rgba(150, 120, 220, 0.35);
+    border-radius: 12px;
+    padding: 20px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(150, 120, 220, 0.2);
+  }
+
+  .panel-title {
+    color: #c0a8ff;
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .panel-close {
+    background: transparent;
+    border: none;
+    color: #7a8aaa;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  .save-actions {
+    margin-bottom: 16px;
+  }
+
+  .save-new-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, rgba(120, 80, 200, 0.6), rgba(80, 50, 150, 0.6));
+    border: 1px solid rgba(180, 140, 255, 0.5);
+    border-radius: 8px;
+    color: #e8dfff;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .save-new-btn:hover {
+    background: linear-gradient(135deg, rgba(140, 100, 220, 0.7), rgba(100, 70, 170, 0.7));
+    transform: translateY(-1px);
+  }
+
+  .save-icon {
+    font-size: 1.1rem;
+  }
+
+  .save-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .save-list-title {
+    color: #a0c8e8;
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .save-count {
+    font-size: 0.72rem;
+    color: #6a8aaa;
+    font-family: 'Courier New', monospace;
+  }
+
+  .save-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .no-saves {
+    text-align: center;
+    padding: 24px;
+    color: #5a7a9a;
+  }
+
+  .no-saves-hint {
+    font-size: 0.78rem;
+    color: #4a6a8a;
+    margin-top: 6px;
+  }
+
+  .save-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    padding: 12px;
+    background: rgba(30, 40, 70, 0.4);
+    border: 1px solid rgba(100, 180, 255, 0.15);
+    border-radius: 8px;
+    gap: 12px;
+  }
+
+  .save-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .save-preview {
+    color: #c0d8f0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .save-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+    color: #5a7a9a;
+  }
+
+  .save-time {
+    font-family: 'Courier New', monospace;
+  }
+
+  .save-node {
+    font-family: 'Courier New', monospace;
+  }
+
+  .save-actions-inline {
+    display: flex;
+    align-items: center;
+  }
+
+  .save-delete-btn {
+    background: rgba(150, 60, 60, 0.2);
+    border: 1px solid rgba(200, 80, 80, 0.3);
+    color: #d08080;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    transition: all 0.2s;
+  }
+
+  .save-delete-btn:hover {
+    background: rgba(180, 60, 60, 0.4);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .chapter-save-toggle {
+      width: 36px;
+      height: 36px;
+      right: 256px;
+      font-size: 0.9rem;
     }
   }
 </style>

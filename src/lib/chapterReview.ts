@@ -4,14 +4,29 @@ import type {
   ChapterPlayRecord,
   ChapterSaveSlot,
   EndingComparisonEntry,
-  StoryNode
+  StoryNode,
+  GameState
 } from '../types/game';
 import { storyData } from '../data/story';
-import { globalMemory } from './memory';
+import { globalMemory, currentPlaythrough } from './memory';
 import { getNode } from './engine';
 
 const CHAPTER_RECORDS_KEY = 'deep_sea_chapter_records';
 const CHAPTER_SAVES_KEY = 'deep_sea_chapter_saves';
+const CHAPTER_REPLAY_KEY = 'deep_sea_chapter_replay_session';
+
+export interface ChapterReplaySession {
+  chapterId: string;
+  startNodeId: string;
+  variablesSnapshot: Record<string, string | number | boolean>;
+  choicesMade: { nodeId: string; choiceId: string; choiceText: string }[];
+  cluesHit: string[];
+  trustChanges: { target: string; value: number; reason?: string }[];
+  danmakuHighlights: string[];
+  nodesVisited: string[];
+  startTime: number;
+  isActive: boolean;
+}
 
 export const chapters: ChapterDefinition[] = [
   {
@@ -112,17 +127,42 @@ function saveChapterSaves(saves: ChapterSaveSlot[]): void {
   localStorage.setItem(CHAPTER_SAVES_KEY, JSON.stringify(saves));
 }
 
+function loadReplaySession(): ChapterReplaySession | null {
+  try {
+    const data = localStorage.getItem(CHAPTER_REPLAY_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (parsed.isActive) return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+function saveReplaySession(session: ChapterReplaySession | null): void {
+  if (session) {
+    localStorage.setItem(CHAPTER_REPLAY_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(CHAPTER_REPLAY_KEY);
+  }
+}
+
 export const chapterRecords = writable<ChapterPlayRecord[]>(loadChapterRecords());
 export const chapterSaves = writable<ChapterSaveSlot[]>(loadChapterSaves());
+export const replaySession = writable<ChapterReplaySession | null>(loadReplaySession());
 
 chapterRecords.subscribe(saveChapterRecords);
 chapterSaves.subscribe(saveChapterSaves);
+replaySession.subscribe(saveReplaySession);
+
+export const isInChapterReplay = derived(replaySession, $s => $s?.isActive ?? false);
+export const currentReplayChapterId = derived(replaySession, $s => $s?.chapterId ?? null);
 
 export const chaptersWithStatus = derived(
-  [chapterRecords, globalMemory],
-  ([$records, $memory]) => {
+  [chapterRecords, globalMemory, chapterSaves],
+  ([$records, $memory, $saves]) => {
     return chapters.map(ch => {
       const records = $records.filter(r => r.chapterId === ch.id);
+      const saves = $saves.filter(s => s.chapterId === ch.id);
       const visited = $memory.playthroughHistory.some(p =>
         p.nodesVisited.some(nId => {
           const node = getNode(nId);
@@ -133,8 +173,10 @@ export const chaptersWithStatus = derived(
         chapter: ch,
         hasRecord: records.length > 0,
         recordCount: records.length,
+        saveCount: saves.length,
         hasVisited: visited,
-        latestRecord: records[records.length - 1] || null
+        latestRecord: records[records.length - 1] || null,
+        latestSave: saves[saves.length - 1] || null
       };
     });
   }
@@ -178,12 +220,202 @@ function collectChapterNodeIds(chapter: ChapterDefinition): Set<string> {
   return ids;
 }
 
+export function getChapterForNode(nodeId: string): ChapterDefinition | null {
+  for (const ch of chapters) {
+    if (isNodeInChapter({ id: nodeId } as StoryNode, ch)) {
+      return ch;
+    }
+  }
+  return null;
+}
+
+export function startChapterReplay(chapterId: string, initialVariables: Record<string, string | number | boolean>): void {
+  const chapter = chapters.find(c => c.id === chapterId);
+  if (!chapter) return;
+
+  const session: ChapterReplaySession = {
+    chapterId,
+    startNodeId: chapter.startNodeId,
+    variablesSnapshot: { ...initialVariables },
+    choicesMade: [],
+    cluesHit: [],
+    trustChanges: [],
+    danmakuHighlights: [],
+    nodesVisited: [chapter.startNodeId],
+    startTime: Date.now(),
+    isActive: true
+  };
+
+  replaySession.set(session);
+}
+
+export function endChapterReplay(
+  finalVariables: Record<string, string | number | boolean>,
+  finalNodeId: string,
+  forceSave = false
+): ChapterPlayRecord | null {
+  const session = get(replaySession);
+  if (!session || !session.isActive) return null;
+
+  const chapter = chapters.find(c => c.id === session.chapterId);
+  if (!chapter) {
+    replaySession.set(null);
+    return null;
+  }
+
+  const hasVisitedChapterNodes = session.nodesVisited.some(nId =>
+    collectChapterNodeIds(chapter).has(nId)
+  );
+
+  if (!hasVisitedChapterNodes && !forceSave) {
+    replaySession.set(null);
+    return null;
+  }
+
+  const varsBefore = session.variablesSnapshot;
+  const varsAfter = { ...finalVariables };
+
+  const cluesHit: string[] = [];
+  const allKeys = new Set([...Object.keys(varsBefore), ...Object.keys(varsAfter)]);
+  for (const key of allKeys) {
+    if (
+      (key.startsWith('clue') || key === 'full_truth') &&
+      varsBefore[key] !== varsAfter[key] &&
+      varsAfter[key]
+    ) {
+      cluesHit.push(key);
+    }
+  }
+
+  const record: ChapterPlayRecord = {
+    chapterId: session.chapterId,
+    nodeId: finalNodeId,
+    variablesBefore: varsBefore,
+    variablesAfter: varsAfter,
+    choicesMade: session.choicesMade,
+    cluesHit,
+    trustChanges: session.trustChanges,
+    danmakuHighlights: session.danmakuHighlights,
+    timestamp: Date.now(),
+    playthroughNumber: get(currentPlaythrough)
+  };
+
+  chapterRecords.update(records => [...records, record]);
+  replaySession.set(null);
+
+  return record;
+}
+
+export function cancelChapterReplay(): void {
+  replaySession.set(null);
+}
+
+export function recordReplayChoice(
+  nodeId: string,
+  choiceId: string,
+  choiceText: string
+): void {
+  replaySession.update(session => {
+    if (!session) return session;
+    return {
+      ...session,
+      choicesMade: [
+        ...session.choicesMade,
+        { nodeId, choiceId, choiceText }
+      ]
+    };
+  });
+}
+
+export function recordReplayNodeVisit(nodeId: string): void {
+  replaySession.update(session => {
+    if (!session) return session;
+    if (session.nodesVisited.includes(nodeId)) return session;
+    return {
+      ...session,
+      nodesVisited: [...session.nodesVisited, nodeId]
+    };
+  });
+}
+
+export function recordReplayTrustChange(
+  target: string,
+  value: number,
+  reason?: string
+): void {
+  replaySession.update(session => {
+    if (!session) return session;
+    return {
+      ...session,
+      trustChanges: [
+        ...session.trustChanges,
+        { target, value, reason }
+      ]
+    };
+  });
+}
+
+export function isNodeInCurrentReplayChapter(nodeId: string): boolean {
+  const session = get(replaySession);
+  if (!session || !session.isActive) return true;
+
+  const chapter = chapters.find(c => c.id === session.chapterId);
+  if (!chapter) return true;
+
+  const chapterNodes = collectChapterNodeIds(chapter);
+  return chapterNodes.has(nodeId);
+}
+
+export function isCurrentReplayEndNode(nodeId: string): boolean {
+  const session = get(replaySession);
+  if (!session || !session.isActive) return false;
+
+  const chapter = chapters.find(c => c.id === session.chapterId);
+  if (!chapter) return false;
+
+  return chapter.endNodeIds.includes(nodeId);
+}
+
+export function getCurrentReplayChapter(): ChapterDefinition | null {
+  const session = get(replaySession);
+  if (!session) return null;
+  return chapters.find(c => c.id === session.chapterId) || null;
+}
+
 export function addChapterRecord(record: ChapterPlayRecord): void {
   chapterRecords.update(records => [...records, record]);
 }
 
 export function getChapterRecords(chapterId: string): ChapterPlayRecord[] {
   return get(chapterRecords).filter(r => r.chapterId === chapterId);
+}
+
+export function createChapterSave(
+  chapterId: string,
+  nodeId: string,
+  dialogueIndex: number,
+  variables: Record<string, string | number | boolean>,
+  preview: string,
+  slotId?: string
+): ChapterSaveSlot {
+  const slot: ChapterSaveSlot = {
+    id: slotId || `slot_${Date.now()}`,
+    chapterId,
+    nodeId,
+    dialogueIndex,
+    variables: { ...variables },
+    savedAt: Date.now(),
+    preview: preview.slice(0, 60)
+  };
+
+  chapterSaves.update(saves => {
+    const filtered = saves.filter(
+      s => !(s.chapterId === slot.chapterId && s.id === slot.id)
+    );
+    return [...filtered, slot];
+  });
+
+  return slot;
 }
 
 export function saveChapterGame(slot: ChapterSaveSlot): void {
@@ -213,7 +445,13 @@ export function deleteChapterSave(chapterId: string, slotId: string): void {
 }
 
 export function getChapterSaves(chapterId: string): ChapterSaveSlot[] {
-  return get(chapterSaves).filter(s => s.chapterId === chapterId);
+  return get(chapterSaves)
+    .filter(s => s.chapterId === chapterId)
+    .sort((a, b) => b.savedAt - a.savedAt);
+}
+
+export function getAllChapterSaves(): ChapterSaveSlot[] {
+  return get(chapterSaves).sort((a, b) => b.savedAt - a.savedAt);
 }
 
 export function clearChapterRecords(chapterId?: string): void {
@@ -269,4 +507,27 @@ export function getChapterNodeIds(chapterId: string): Set<string> {
   const chapter = chapters.find(c => c.id === chapterId);
   if (!chapter) return new Set();
   return collectChapterNodeIds(chapter);
+}
+
+export function getCurrentReplayProgress(): { current: number; total: number } {
+  const session = get(replaySession);
+  if (!session) return { current: 0, total: 0 };
+
+  const chapter = chapters.find(c => c.id === session.chapterId);
+  if (!chapter) return { current: 0, total: 0 };
+
+  const total = collectChapterNodeIds(chapter).size;
+  const chapterNodes = collectChapterNodeIds(chapter);
+  const current = session.nodesVisited.filter(n => chapterNodes.has(n)).length;
+
+  return { current, total };
+}
+
+export function restoreStateFromChapterSave(slot: ChapterSaveSlot, gameStateStore: typeof import('./store').gameState): void {
+  const state: Partial<GameState> = {
+    currentNodeId: slot.nodeId,
+    dialogueIndex: slot.dialogueIndex,
+    variables: { ...slot.variables }
+  };
+  gameStateStore.update(s => ({ ...s, ...state, dialogueIndex: 0 }));
 }
