@@ -14,6 +14,7 @@
   export let onShowAchievements: () => void;
   export let onShowChapterReview: () => void;
   export let onShowArchive: () => void;
+  export let onShowWorldview: () => void;
   export let onOpenEditor: () => void;
 
   let saveSlots: SaveSlot[] = [];
@@ -76,6 +77,11 @@
   function handleArchive() {
     playSFX('click');
     onShowArchive();
+  }
+
+  function handleWorldview() {
+    playSFX('click');
+    onShowWorldview();
   }
 
   function handleEditor() {
@@ -180,6 +186,11 @@
         <button class="menu-btn" on:click={handleArchive}>
           <span class="btn-icon">🗄</span>
           <span class="btn-text">事故档案库</span>
+        </button>
+
+        <button class="menu-btn" on:click={handleWorldview}>
+          <span class="btn-icon">📚</span>
+          <span class="btn-text">世界观百科</span>
         </button>
 
         <button class="menu-btn" on:click={handleSettings}>

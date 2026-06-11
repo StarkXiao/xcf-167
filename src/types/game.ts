@@ -993,4 +993,82 @@ export interface SignalAnalysisReward {
   scoreBonus?: number;
 }
 
+export type WorldviewCategory = 'creature' | 'equipment' | 'mail' | 'chronology';
+
+export interface WorldviewNode {
+  id: string;
+  category: WorldviewCategory;
+  title: string;
+  subtitle?: string;
+  summary: string;
+  content: string;
+  icon: string;
+  requiresClues?: string[];
+  requiresEndings?: string[];
+  requiresPlaythroughAtLeast?: number;
+  parentNodeId?: string;
+  childNodeIds?: string[];
+  relatedNodeIds?: string[];
+  unlockedAt?: number;
+  tags?: string[];
+  order: number;
+}
+
+export interface CreatureProfile extends WorldviewNode {
+  category: 'creature';
+  scientificName?: string;
+  depthRange?: string;
+  classification?: 'biological' | 'artificial' | 'hybrid' | 'unknown';
+  threatLevel?: 1 | 2 | 3 | 4 | 5;
+  firstSighted?: string;
+  physicalDescription?: string;
+  behavioralNotes?: string;
+}
+
+export interface EquipmentLog extends WorldviewNode {
+  category: 'equipment';
+  model?: string;
+  manufacturer?: string;
+  deployDate?: string;
+  status?: 'active' | 'destroyed' | 'retired' | 'classified';
+  specs?: Record<string, string>;
+  maintenanceLogs?: { date: string; entry: string }[];
+  operatorId?: string;
+}
+
+export interface MailCorrespondence extends WorldviewNode {
+  category: 'mail';
+  from: string;
+  to: string;
+  date: string;
+  subject: string;
+  attachments?: string[];
+  threadId?: string;
+  replyToMailId?: string;
+  securityLevel?: 'public' | 'internal' | 'restricted' | 'classified';
+}
+
+export interface ChronologyEvent extends WorldviewNode {
+  category: 'chronology';
+  eventDate: string;
+  eventTime?: string;
+  location?: string;
+  depth?: string;
+  involvedParties?: string[];
+  eventType: 'incident' | 'research' | 'operation' | 'discovery' | 'classified';
+  consequence?: string;
+  evidenceRefs?: string[];
+}
+
+export interface WorldviewTreeState {
+  unlockedNodes: Record<string, { unlockedAt: number; firstPlaythrough: number }>;
+  expandedCategories: Record<WorldviewCategory, boolean>;
+  selectedNodeId: string | null;
+  isOpen: boolean;
+  activeCategory: WorldviewCategory | 'all';
+  searchQuery: string;
+}
+
+export type WorldviewTab = WorldviewCategory | 'tree';
+
 

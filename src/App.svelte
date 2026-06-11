@@ -8,6 +8,7 @@
   import ChapterReview from './components/ChapterReview.svelte';
   import ChapterEndOverlay from './components/ChapterEndOverlay.svelte';
   import ArchiveHub from './components/ArchiveHub.svelte';
+  import WorldviewEncyclopedia from './components/WorldviewEncyclopedia.svelte';
   import EditorHub from './components/editor/EditorHub.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue, getCurrentNode } from './lib/engine';
@@ -35,6 +36,7 @@
   let showChapterReview = false;
   let showChapterEnd = false;
   let showArchive = false;
+  let showWorldview = false;
   let chapterEndNodeId = '';
 
   function handleNewGame() {
@@ -79,6 +81,10 @@
     showArchive = true;
   }
 
+  function handleShowWorldview() {
+    showWorldview = true;
+  }
+
   function handleOpenEditor() {
     stopBGM();
     scene = 'editor';
@@ -112,6 +118,10 @@
 
   function handleCloseArchive() {
     showArchive = false;
+  }
+
+  function handleCloseWorldview() {
+    showWorldview = false;
   }
 
   function handleReplayChapter(chapter: ChapterDefinition) {
@@ -226,6 +236,7 @@
       onShowAchievements={handleShowAchievements}
       onShowChapterReview={handleShowChapterReview}
       onShowArchive={handleShowArchive}
+      onShowWorldview={handleShowWorldview}
       onOpenEditor={handleOpenEditor}
     />
   {:else if scene === 'playing'}
@@ -256,6 +267,7 @@
     onSaveAndExit={handleChapterEndSaveAndExit}
   />
   <ArchiveHub isOpen={showArchive} onClose={handleCloseArchive} />
+  <WorldviewEncyclopedia isOpen={showWorldview} onClose={handleCloseWorldview} />
 </div>
 
 <style>
