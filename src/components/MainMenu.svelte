@@ -14,6 +14,7 @@
   export let onShowAchievements: () => void;
   export let onShowChapterReview: () => void;
   export let onShowArchive: () => void;
+  export let onOpenEditor: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -75,6 +76,11 @@
   function handleArchive() {
     playSFX('click');
     onShowArchive();
+  }
+
+  function handleEditor() {
+    playSFX('select');
+    onOpenEditor();
   }
 
   function backToMenu() {
@@ -179,6 +185,11 @@
         <button class="menu-btn" on:click={handleSettings}>
           <span class="btn-icon">⚙</span>
           <span class="btn-text">设置</span>
+        </button>
+
+        <button class="menu-btn editor-btn" on:click={handleEditor}>
+          <span class="btn-icon">🔬</span>
+          <span class="btn-text">深海研究所后台</span>
         </button>
       </div>
 
@@ -551,5 +562,15 @@
 
   .back-btn:hover {
     background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  }
+
+  .menu-btn.editor-btn {
+    background: linear-gradient(135deg, rgba(0, 180, 150, 0.15), rgba(0, 120, 100, 0.1));
+    border-color: rgba(0, 200, 160, 0.3);
+  }
+
+  .menu-btn.editor-btn:hover, .menu-btn.editor-btn:active {
+    background: linear-gradient(135deg, rgba(0, 200, 160, 0.3), rgba(0, 150, 120, 0.2));
+    border-color: rgba(0, 255, 200, 0.6);
   }
 </style>

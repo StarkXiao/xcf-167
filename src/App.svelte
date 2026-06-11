@@ -8,6 +8,7 @@
   import ChapterReview from './components/ChapterReview.svelte';
   import ChapterEndOverlay from './components/ChapterEndOverlay.svelte';
   import ArchiveHub from './components/ArchiveHub.svelte';
+  import EditorHub from './components/editor/EditorHub.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue, getCurrentNode } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
@@ -26,7 +27,8 @@
   import type { GameScene as GameSceneType, SaveSlot, ChapterDefinition, ChapterSaveSlot, ChapterNodeSnapshot } from './types/game';
   import { get } from 'svelte/store';
 
-  let scene: GameSceneType = 'menu';
+  type AppScene = GameSceneType | 'editor';
+  let scene: AppScene = 'menu';
   let showSettings = false;
   let showEndings = false;
   let showAchievements = false;
@@ -75,6 +77,11 @@
 
   function handleShowArchive() {
     showArchive = true;
+  }
+
+  function handleOpenEditor() {
+    stopBGM();
+    scene = 'editor';
   }
 
   function handleBackToMenu() {
@@ -219,6 +226,7 @@
       onShowAchievements={handleShowAchievements}
       onShowChapterReview={handleShowChapterReview}
       onShowArchive={handleShowArchive}
+      onOpenEditor={handleOpenEditor}
     />
   {:else if scene === 'playing'}
     <GameScene 
@@ -227,6 +235,8 @@
       onShowChapterReview={handleShowChapterReview}
       onNodeReached={handleNodeReached}
     />
+  {:else if scene === 'editor'}
+    <EditorHub onBackToMenu={handleBackToMenu} />
   {/if}
 
   <EndingsGallery isOpen={showEndings} onClose={handleCloseEndings} />
