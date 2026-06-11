@@ -10,7 +10,39 @@
     setPreviewNode
   } from '../../lib/editorStore';
   import { playSFX, playBGM, stopBGM } from '../../lib/audio';
-  import type { StoryNode, DialogueLine, Choice, Danmaku, Ending } from '../../types/game';
+  import type {
+    StoryNode,
+    DialogueLine,
+    Choice,
+    Danmaku,
+    Ending,
+    StateCondition,
+    StateEffect,
+    TrustCondition,
+    TrustEffect,
+    MemoryCondition,
+    NextNodeBranch
+  } from '../../types/game';
+  import {
+    globalMemory,
+    checkMemoryCondition,
+    unlockClue,
+    recordPlaythrough
+  } from '../../lib/memory';
+  import {
+    trustState,
+    applyTrustEffect,
+    applyTrustChange,
+    checkTrustCondition,
+    getCrewTrust,
+    getCrewTrustLevel,
+    getTrustLevel,
+    getTrustLevelLabel,
+    getTrustLevelColor,
+    CREW_MEMBERS,
+    resetTrustState,
+    getTrustEndingModifiers
+  } from '../../lib/trust';
 
   export let onClose: () => void;
 
@@ -25,7 +57,6 @@
   let typingInterval: any = null;
   let activeDanmakus: any[] = [];
   let danmakuTimeouts: any[] = [];
-  let availableChoices: Choice[] = [];
   let showChoices: boolean = false;
   let currentEnding: Ending | null = null;
   let visitedPath: string[] = [];
@@ -38,15 +69,130 @@
   let hasChoices: boolean = false;
   let allEndings: Ending[] = [];
 
+  let stateVariables: Record<string, any> = {};
+  let endingWeights: Record<string, number> = {};
+  let playthroughNumber: number = 1;
+  let unlockedClues: Record<string, boolean> = {};
+  let visitedNodes: Set<string> = new Set();
+
   $: currentNode = nodes.find(n => n.id === currentNodeId);
   $: currentDialogue = currentNode?.dialogues?.[dialogueIndex];
   $: dialogueCount = currentNode?.dialogues?.length || 0;
   $: atDialogueEnd = dialogueIndex >= dialogueCount - 1;
-  $: hasChoices = !!(currentNode?.choices && currentNode.choices.length > 0);
   $: allEndings = $editorState.editedEndings ? Array.from($editorState.editedEndings.values()) : [];
+
+  $: availableChoices = (() => {
+    if (!currentNode?.choices) return [];
+    return currentNode.choices.filter(c => {
+      const stateOk = checkPreviewCondition(c.condition);
+      const trustOk = checkPreviewTrustCondition(c.trustCondition);
+      const memOk = checkPreviewMemoryCondition(c.memoryCondition);
+      return stateOk && trustOk && memOk;
+    });
+  })();
+
+  $: resolvedBranch = (() => {
+    if (!currentNode?.nextNodeBranches || currentNode.nextNodeBranches.length === 0) {
+      return null;
+    }
+    const sorted = [...currentNode.nextNodeBranches].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    for (const branch of sorted) {
+      const stateOk = checkPreviewCondition(branch.condition);
+      const trustOk = checkPreviewTrustCondition(branch.trustCondition);
+      const memOk = checkPreviewMemoryCondition(branch.memoryCondition);
+      if (stateOk && trustOk && memOk) {
+        return branch;
+      }
+    }
+    return null;
+  })();
+
+  $: hasChoices = availableChoices.length > 0;
+  $: trustInfo = $trustState;
+
+  function checkPreviewCondition(condition?: StateCondition): boolean {
+    if (!condition) return true;
+    for (const [key, value] of Object.entries(condition)) {
+      if (stateVariables[key] !== value) return false;
+    }
+    return true;
+  }
+
+  function checkPreviewTrustCondition(condition?: TrustCondition): boolean {
+    return checkTrustCondition(condition);
+  }
+
+  function checkPreviewMemoryCondition(condition?: MemoryCondition): boolean {
+    if (!condition) return true;
+    const memory = get(globalMemory);
+
+    if (condition.requiredClues) {
+      for (const clueId of condition.requiredClues) {
+        if (!unlockedClues[clueId] && !memory.unlockedClues[clueId]) return false;
+      }
+    }
+
+    if (condition.anyClues) {
+      const hasAny = condition.anyClues.some(clueId => unlockedClues[clueId] || memory.unlockedClues[clueId]);
+      if (!hasAny) return false;
+    }
+
+    if (condition.requiredEndings) {
+      const memoryEndings = memory.playthroughHistory.map(p => p.endingId).filter(Boolean) as string[];
+      for (const endingId of condition.requiredEndings) {
+        if (!memoryEndings.includes(endingId)) return false;
+      }
+    }
+
+    if (condition.playthroughAtLeast) {
+      if (playthroughNumber < condition.playthroughAtLeast && memory.currentPlaythrough < condition.playthroughAtLeast) return false;
+    }
+
+    return true;
+  }
+
+  function applyPreviewEffect(effect?: StateEffect): void {
+    if (!effect) return;
+    for (const [key, value] of Object.entries(effect)) {
+      stateVariables[key] = value;
+    }
+  }
+
+  function applyPreviewTrustEffect(effect?: TrustEffect): void {
+    applyTrustEffect(effect);
+  }
+
+  function applyPreviewMemoryEffect(choice: Choice): void {
+    if (choice.memoryEffect?.clueToUnlock) {
+      unlockedClues[choice.memoryEffect.clueToUnlock] = true;
+    }
+  }
+
+  function addPreviewEndingWeight(endingId: string, value: number, source: string): void {
+    if (!endingWeights[endingId]) endingWeights[endingId] = 0;
+    endingWeights[endingId] += value;
+  }
+
+  function getChoiceDisplayText(choice: Choice): string {
+    if (choice.memoryText && checkPreviewMemoryCondition(choice.memoryCondition)) {
+      return choice.memoryText;
+    }
+    return choice.text;
+  }
 
   function getNode(id: string): StoryNode | undefined {
     return nodes.find(n => n.id === id);
+  }
+
+  function resolveNextNodeId(): string | undefined {
+    if (!currentNode) return undefined;
+
+    if (currentNode.nextNodeBranches && currentNode.nextNodeBranches.length > 0) {
+      const branch = resolvedBranch;
+      if (branch) return branch.nextNodeId;
+    }
+
+    return currentNode.nextNodeId;
   }
 
   function startPreview() {
@@ -66,10 +212,14 @@
     displayedText = '';
     isTyping = false;
     activeDanmakus = [];
-    availableChoices = [];
     showChoices = false;
     currentEnding = null;
     visitedPath = [];
+    stateVariables = {};
+    endingWeights = {};
+    unlockedClues = {};
+    visitedNodes = new Set();
+    resetTrustState();
   }
 
   function stopAllTimers() {
@@ -98,9 +248,18 @@
     currentNodeId = nodeId;
     dialogueIndex = 0;
     visitedPath = [...visitedPath, nodeId];
+    visitedNodes.add(nodeId);
 
     if (node.bgm) {
       playBGM(node.bgm);
+    }
+
+    if (node.effects) {
+      applyPreviewEffect(node.effects);
+    }
+
+    if (node.trustEffect) {
+      applyPreviewTrustEffect(node.trustEffect);
     }
 
     if (node.isEnding && node.endingId) {
@@ -132,6 +291,10 @@
         }, delay);
         danmakuTimeouts.push(t);
       });
+    }
+
+    if (dialogue.trustEffect) {
+      applyPreviewTrustEffect(dialogue.trustEffect);
     }
 
     triggerDanmakus(idx);
@@ -224,27 +387,29 @@
       showDialogue(dialogueIndex);
     } else {
       if (hasChoices) {
-        availableChoices = currentNode!.choices!.filter(c => true);
         showChoices = true;
-      } else if (currentNode?.nextNodeId) {
-        loadNode(currentNode.nextNodeId);
-      } else if (currentNode?.isEnding) {
-        const endingId = currentNode.endingId;
-        if (endingId) {
-          const ending = allEndings.find(e => e.id === endingId);
-          if (ending) {
-            currentEnding = ending;
-          }
-        } else if (currentNode.endingTitle) {
-          currentEnding = {
-            id: 'inline',
-            title: currentNode.endingTitle,
-            description: currentNode.endingDescription || '',
-            isGood: false
-          };
-        }
       } else {
-        alert('此节点已结束（没有后续节点或选项）');
+        const nextId = resolveNextNodeId();
+        if (nextId) {
+          loadNode(nextId);
+        } else if (currentNode?.isEnding) {
+          const endingId = currentNode.endingId;
+          if (endingId) {
+            const ending = allEndings.find(e => e.id === endingId);
+            if (ending) {
+              currentEnding = ending;
+            }
+          } else if (currentNode.endingTitle) {
+            currentEnding = {
+              id: 'inline',
+              title: currentNode.endingTitle,
+              description: currentNode.endingDescription || '',
+              isGood: false
+            };
+          }
+        } else {
+          alert('此节点已结束（没有后续节点或选项）');
+        }
       }
     }
   }
@@ -257,10 +422,17 @@
   function handleSelectChoice(choice: Choice) {
     playSFX('select');
     showChoices = false;
+
     if (choice.effect) {
-      // 变量效果记录但仅做提示
-      console.log('变量效果:', choice.effect);
+      applyPreviewEffect(choice.effect);
     }
+
+    if (choice.trustEffect) {
+      applyPreviewTrustEffect(choice.trustEffect);
+    }
+
+    applyPreviewMemoryEffect(choice);
+
     if (choice.nextNodeId) {
       loadNode(choice.nextNodeId);
     } else {
@@ -270,6 +442,7 @@
 
   function handleRestart() {
     playSFX('click');
+    playthroughNumber++;
     startPreview();
   }
 
@@ -340,111 +513,243 @@
     </div>
   </header>
 
-  <div class="preview-scene" on:click={!showChoices && !currentEnding ? handleAdvance : undefined}>
-    <div class="scene-bg {currentNode?.background || 'default-bg'}">
-      <div class="bg-overlay"></div>
+  <div class="preview-body">
+    <div class="preview-scene" on:click={!showChoices && !currentEnding ? handleAdvance : undefined}>
+      <div class="scene-bg {currentNode?.background || 'default-bg'}">
+        <div class="bg-overlay"></div>
 
-      <div class="danmaku-layer">
-        {#each activeDanmakus as dm}
-          <div
-            class="danmaku-item"
-            style="
-              top: {dm.lane * 18 + 5}%;
-              color: {dm.color || '#ffffff'};
-              animation-duration: {dm.duration}ms;
-              font-weight: {dm.isImportant ? '700' : '400'};
-              border-color: {dm.isBackendOnly ? '#00ffcc' : 'transparent'};
-              background: {dm.isImportant ? 'rgba(255,204,0,0.15)' : dm.isBackendOnly ? 'rgba(0,255,204,0.1)' : 'transparent'};
-            "
-            class:important={dm.isImportant}
-            class:backend={dm.isBackendOnly}
-          >
-            <span class="dm-username">{dm.username}:</span>
-            <span class="dm-content">{dm.content}</span>
-          </div>
-        {/each}
-      </div>
-
-      {#if currentEnding}
-        <div class="ending-overlay">
-          <div class="ending-card {currentEnding.isGood ? 'good' : 'bad'}">
-            <div class="ending-icon">{currentEnding.isGood ? '🌟' : '💀'}</div>
-            <div class="ending-type">{currentEnding.isGood ? '— 好结局 —' : '— 坏结局 —'}</div>
-            <h3 class="ending-title">{currentEnding.title}</h3>
-            <p class="ending-desc">{currentEnding.description}</p>
-            <div class="ending-actions">
-              <button class="ending-btn" on:click|stopPropagation={handleRestart}>
-                ↺ 重新预览
-              </button>
-              <button class="ending-btn primary" on:click|stopPropagation={handleBackToEditor}>
-                返回编辑
-              </button>
+        <div class="danmaku-layer">
+          {#each activeDanmakus as dm}
+            <div
+              class="danmaku-item"
+              style="
+                top: {dm.lane * 18 + 5}%;
+                color: {dm.color || '#ffffff'};
+                animation-duration: {dm.duration}ms;
+                font-weight: {dm.isImportant ? '700' : '400'};
+                border-color: {dm.isBackendOnly ? '#00ffcc' : 'transparent'};
+                background: {dm.isImportant ? 'rgba(255,204,0,0.15)' : dm.isBackendOnly ? 'rgba(0,255,204,0.1)' : 'transparent'};
+              "
+              class:important={dm.isImportant}
+              class:backend={dm.isBackendOnly}
+            >
+              <span class="dm-username">{dm.username}:</span>
+              <span class="dm-content">{dm.content}</span>
             </div>
-          </div>
-        </div>
-      {:else}
-        <div class="dialogue-area">
-          {#if currentDialogue?.speaker}
-            <div class="speaker-box">
-              <span class="speaker-name">{currentDialogue.speaker}</span>
-              {#if currentDialogue.mood}
-                <span class="mood-tag">【{currentDialogue.mood}】</span>
-              {/if}
-            </div>
-          {/if}
-          <div class="dialogue-box">
-            <p class="dialogue-text">{displayedText}{#if isTyping}<span class="cursor">|</span>{/if}</p>
-            <div class="progress-info">
-              <span>{dialogueIndex + 1} / {dialogueCount}</span>
-              {#if !showChoices && !isTyping}
-                <span class="click-hint">▼ 点击继续</span>
-              {/if}
-            </div>
-          </div>
+          {/each}
         </div>
 
-        {#if showChoices}
-          <div class="choices-panel" on:click|stopPropagation>
-            <div class="choices-title">请做出选择：</div>
-            <div class="choices-list">
-              {#each availableChoices as choice, idx}
-                <button
-                  class="choice-btn"
-                  on:click={() => handleSelectChoice(choice)}
-                  style="--idx: {idx};"
-                >
-                  <span class="choice-num">{idx + 1}</span>
-                  <span class="choice-text">{choice.text}</span>
-                  {#if choice.nextNodeId}
-                    <span class="choice-target">→ {choice.nextNodeId}</span>
-                  {/if}
+        {#if currentEnding}
+          <div class="ending-overlay">
+            <div class="ending-card {currentEnding.isGood ? 'good' : 'bad'}">
+              <div class="ending-icon">{currentEnding.isGood ? '🌟' : '💀'}</div>
+              <div class="ending-type">{currentEnding.isGood ? '— 好结局 —' : '— 坏结局 —'}</div>
+              <h3 class="ending-title">{currentEnding.title}</h3>
+              <p class="ending-desc">{currentEnding.description}</p>
+              <div class="ending-weights-preview">
+                <div class="ew-title">结局权重快照</div>
+                {#each Object.entries(endingWeights).sort((a, b) => b[1] - a[1]) as [eid, weight]}
+                  <div class="ew-row">
+                    <span class="ew-id">{eid}</span>
+                    <span class="ew-val">{weight > 0 ? '+' : ''}{weight}</span>
+                  </div>
+                {/each}
+                {#if Object.keys(endingWeights).length === 0}
+                  <div class="ew-empty">暂无权重累积</div>
+                {/if}
+              </div>
+              <div class="ending-actions">
+                <button class="ending-btn" on:click|stopPropagation={handleRestart}>
+                  ↺ 重新预览
                 </button>
-              {/each}
+                <button class="ending-btn primary" on:click|stopPropagation={handleBackToEditor}>
+                  返回编辑
+                </button>
+              </div>
             </div>
           </div>
-        {/if}
-      {/if}
+        {:else}
+          <div class="dialogue-area">
+            {#if currentDialogue?.speaker}
+              <div class="speaker-box">
+                <span class="speaker-name">{currentDialogue.speaker}</span>
+                {#if currentDialogue.mood}
+                  <span class="mood-tag">【{currentDialogue.mood}】</span>
+                {/if}
+              </div>
+            {/if}
+            <div class="dialogue-box">
+              <p class="dialogue-text">{displayedText}{#if isTyping}<span class="cursor">|</span>{/if}</p>
+              <div class="progress-info">
+                <span>{dialogueIndex + 1} / {dialogueCount}</span>
+                {#if !showChoices && !isTyping}
+                  <span class="click-hint">▼ 点击继续</span>
+                {/if}
+              </div>
+            </div>
+          </div>
 
-      <div class="path-trail">
-        <span class="trail-label">路径:</span>
-        {#each visitedPath as nid, idx}
-          <span class="trail-node">{nid}</span>
-          {#if idx < visitedPath.length - 1}
-            <span class="trail-arrow">→</span>
+          {#if showChoices}
+            <div class="choices-panel" on:click|stopPropagation>
+              <div class="choices-title">请做出选择：</div>
+              <div class="choices-list">
+                {#each availableChoices as choice, idx}
+                  <button
+                    class="choice-btn"
+                    on:click={() => handleSelectChoice(choice)}
+                    style="--idx: {idx};"
+                  >
+                    <span class="choice-num">{idx + 1}</span>
+                    <span class="choice-text">{getChoiceDisplayText(choice)}</span>
+                    {#if choice.nextNodeId}
+                      <span class="choice-target">→ {choice.nextNodeId}</span>
+                    {/if}
+                    {#if choice.trustEffect?.changes}
+                      <span class="choice-trust-hint">
+                        {#each choice.trustEffect.changes as ch}
+                          {ch.target}:{ch.value > 0 ? '+' : ''}{ch.value}
+                        {/each}
+                      </span>
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            </div>
           {/if}
-        {/each}
+        {/if}
+
+        <div class="path-trail">
+          <span class="trail-label">路径:</span>
+          {#each visitedPath as nid, idx}
+            <span class="trail-node">{nid}</span>
+            {#if idx < visitedPath.length - 1}
+              <span class="trail-arrow">→</span>
+            {/if}
+          {/each}
+        </div>
       </div>
     </div>
+
+    <aside class="state-sidebar">
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">📊 游戏状态</h4>
+        <div class="state-vars">
+          {#each Object.entries(stateVariables) as [key, val]}
+            <div class="var-row">
+              <span class="var-key">{key}</span>
+              <span class="var-val">{typeof val === 'object' ? JSON.stringify(val) : String(val)}</span>
+            </div>
+          {/each}
+          {#if Object.keys(stateVariables).length === 0}
+            <div class="var-empty">暂无变量</div>
+          {/if}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">🤝 信任状态</h4>
+        <div class="trust-list">
+          {#each CREW_MEMBERS as member}
+            {@const trust = $trustState.crew[member.id]}
+            <div class="trust-row">
+              <span class="trust-name">{member.name}</span>
+              <span class="trust-level" style="color: {getTrustLevelColor(trust?.level || 'neutral')}">
+                {getTrustLevelLabel(trust?.level || 'neutral')}
+              </span>
+              <span class="trust-value">{trust?.value ?? 0}</span>
+            </div>
+          {/each}
+          <div class="trust-overall">
+            总体: {$trustState.overallTrust}
+            <span class="trust-level" style="color: {getTrustLevelColor(getTrustLevel($trustState.overallTrust))}">
+              {getTrustLevelLabel(getTrustLevel($trustState.overallTrust))}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">🧩 已解锁线索</h4>
+        <div class="clue-list">
+          {#each Object.keys(unlockedClues) as clueId}
+            <div class="clue-item">{clueId}</div>
+          {/each}
+          {#if Object.keys(unlockedClues).length === 0}
+            <div class="var-empty">暂无线索</div>
+          {/if}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">⚖️ 结局权重</h4>
+        <div class="weight-list">
+          {#each Object.entries(endingWeights).sort((a, b) => b[1] - a[1]) as [eid, weight]}
+            <div class="weight-row">
+              <span class="weight-id">{eid}</span>
+              <div class="weight-bar-wrap">
+                <div
+                  class="weight-bar"
+                  class:positive={weight > 0}
+                  class:negative={weight < 0}
+                  style="width: {Math.min(Math.abs(weight), 100)}%"
+                ></div>
+              </div>
+              <span class="weight-val">{weight > 0 ? '+' : ''}{weight}</span>
+            </div>
+          {/each}
+          {#if Object.keys(endingWeights).length === 0}
+            <div class="var-empty">暂无权重</div>
+          {/if}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">🔀 分支解析</h4>
+        {#if resolvedBranch}
+          <div class="branch-resolved">
+            <span class="branch-target">→ {resolvedBranch.nextNodeId}</span>
+            <span class="branch-priority">优先级: {resolvedBranch.priority ?? 0}</span>
+          </div>
+        {:else if currentNode?.nextNodeBranches && currentNode.nextNodeBranches.length > 0}
+          <div class="branch-unresolved">
+            {#each currentNode.nextNodeBranches as branch, bIdx}
+              <div class="branch-fail">
+                <span>分支#{bIdx + 1} → {branch.nextNodeId}</span>
+                <span class="fail-reason">
+                  {#if !checkPreviewCondition(branch.condition)}❌变量条件{/if}
+                  {#if !checkPreviewTrustCondition(branch.trustCondition)}❌信任条件{/if}
+                  {#if !checkPreviewMemoryCondition(branch.memoryCondition)}❌记忆条件{/if}
+                </span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="var-empty">
+            {#if currentNode?.nextNodeId}
+              直连 → {currentNode.nextNodeId}
+            {:else}
+              无分支
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">🔢 周目: {playthroughNumber}</h4>
+      </div>
+    </aside>
   </div>
 
   <footer class="preview-footer">
     <div class="footer-hint">
-      💡 提示：点击画面或对白框可推进剧情 · 可随时用顶部按钮跳转或编辑节点
+      💡 提示：点击画面推进剧情 · 选项按条件过滤 · 右侧面板实时显示状态/信任/分支解析
     </div>
     <div class="footer-info">
       <span>节点数: {nodes.length}</span>
       <span>·</span>
-      <span>当前深度: {visitedPath.length}</span>
+      <span>深度: {visitedPath.length}</span>
+      <span>·</span>
+      <span>变量: {Object.keys(stateVariables).length}</span>
     </div>
   </footer>
 </div>
@@ -525,9 +830,7 @@
     font-size: 0.82rem;
   }
 
-  .node-label {
-    color: #5a8aaa;
-  }
+  .node-label { color: #5a8aaa; }
 
   .node-id {
     padding: 2px 8px;
@@ -538,9 +841,7 @@
     font-family: 'Courier New', monospace;
   }
 
-  .node-title {
-    color: #a0c0e0;
-  }
+  .node-title { color: #a0c0e0; }
 
   .header-controls {
     display: flex;
@@ -572,6 +873,12 @@
 
   .ctrl-btn.primary:hover {
     background: rgba(0, 255, 200, 0.25);
+  }
+
+  .preview-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
   }
 
   .preview-scene {
@@ -837,6 +1144,13 @@
     font-family: 'Courier New', monospace;
   }
 
+  .choice-trust-hint {
+    font-size: 0.7rem;
+    color: #60a0c0;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+  }
+
   .ending-overlay {
     position: absolute;
     inset: 0;
@@ -859,14 +1173,8 @@
   }
 
   @keyframes endingPop {
-    from {
-      opacity: 0;
-      transform: scale(0.8);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
   }
 
   .ending-card.good {
@@ -913,10 +1221,46 @@
   .ending-card.bad .ending-title { color: #ff8080; text-shadow: 0 0 20px rgba(255,100,100,0.4); }
 
   .ending-desc {
-    margin: 0 0 28px;
+    margin: 0 0 18px;
     color: #c0d0e0;
     line-height: 1.9;
     font-size: 0.95rem;
+  }
+
+  .ending-weights-preview {
+    margin: 0 0 18px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    text-align: left;
+  }
+
+  .ew-title {
+    font-size: 0.8rem;
+    color: #8aa0b8;
+    margin-bottom: 6px;
+  }
+
+  .ew-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 2px 0;
+  }
+
+  .ew-id {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+  }
+
+  .ew-val {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+
+  .ew-empty {
+    font-size: 0.78rem;
+    color: #5a6a7a;
   }
 
   .ending-actions {
@@ -970,10 +1314,7 @@
     overflow-x: auto;
   }
 
-  .trail-label {
-    color: #5a8aaa;
-    margin-right: 4px;
-  }
+  .trail-label { color: #5a8aaa; margin-right: 4px; }
 
   .trail-node {
     padding: 2px 8px;
@@ -984,9 +1325,202 @@
     font-family: 'Courier New', monospace;
   }
 
-  .trail-arrow {
-    color: #4a6a8a;
-    opacity: 0.6;
+  .trail-arrow { color: #4a6a8a; opacity: 0.6; }
+
+  .state-sidebar {
+    width: 260px;
+    background: #0d1525;
+    border-left: 1px solid rgba(0, 255, 200, 0.15);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .sidebar-title {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: #00c8e0;
+    font-weight: 600;
+  }
+
+  .state-vars {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .var-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    padding: 3px 0;
+  }
+
+  .var-key {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+  }
+
+  .var-val {
+    color: #ffc060;
+    font-family: 'Courier New', monospace;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .var-empty {
+    font-size: 0.78rem;
+    color: #3a6a8a;
+  }
+
+  .trust-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .trust-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+
+  .trust-name {
+    color: #a0c0e0;
+    min-width: 40px;
+  }
+
+  .trust-level {
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .trust-value {
+    font-family: 'Courier New', monospace;
+    color: #8aa0b8;
+    margin-left: auto;
+  }
+
+  .trust-overall {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    color: #8aa0b8;
+  }
+
+  .clue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .clue-item {
+    font-size: 0.75rem;
+    color: #60d0a0;
+    font-family: 'Courier New', monospace;
+    padding: 2px 6px;
+    background: rgba(0, 255, 150, 0.06);
+    border-radius: 3px;
+  }
+
+  .weight-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .weight-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+
+  .weight-id {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+    min-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .weight-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .weight-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .weight-bar.positive { background: #4ade80; }
+  .weight-bar.negative { background: #f87171; }
+
+  .weight-val {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .weight-val { color: #8aa0b8; }
+
+  .branch-resolved {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.78rem;
+  }
+
+  .branch-target {
+    color: #4ade80;
+    font-weight: 600;
+  }
+
+  .branch-priority {
+    color: #5a8aaa;
+    font-size: 0.72rem;
+  }
+
+  .branch-unresolved {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .branch-fail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.75rem;
+    color: #f87171;
+    padding: 4px 6px;
+    background: rgba(255, 100, 100, 0.06);
+    border-radius: 4px;
+  }
+
+  .fail-reason {
+    font-size: 0.7rem;
+    color: #ff9090;
   }
 
   .preview-footer {

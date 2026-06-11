@@ -18,7 +18,18 @@
     deleteChoice,
     addSfx,
     updateSfx,
-    deleteSfx
+    deleteSfx,
+    addBranch,
+    updateBranch,
+    deleteBranch,
+    updateChoiceCondition,
+    updateChoiceTrustCondition,
+    updateChoiceMemoryCondition,
+    updateNodeTrustEffect,
+    crewMembers,
+    trustLevels,
+    trustLevelLabels,
+    collectAllVariables
   } from '../../lib/editorStore';
   import { playSFX } from '../../lib/audio';
   import type { BGMType, MoodType, SFXType } from '../../types/game';
@@ -33,6 +44,58 @@
   $: selectedDialogueIdx = $editorState.selectedDialogueIndex;
   $: dialogues = node?.dialogues || [];
   $: choices = node?.choices || [];
+  $: branches = node?.nextNodeBranches || [];
+  $: allVars = collectAllVariables();
+
+  function handleAddBranch() {
+    if (!node) return;
+    playSFX('notify');
+    addBranch(node.id);
+  }
+
+  function handleUpdateBranch(idx: number, field: string, value: any) {
+    if (!node) return;
+    playSFX('click');
+    updateBranch(node.id, idx, { [field]: value });
+  }
+
+  function handleDeleteBranch(idx: number) {
+    if (!node) return;
+    playSFX('warning');
+    deleteBranch(node.id, idx);
+  }
+
+  function handleChoiceConditionEdit(cIdx: number, condJson: string) {
+    if (!node) return;
+    try {
+      const cond = condJson.trim() ? JSON.parse(condJson) : undefined;
+      updateChoiceCondition(node.id, cIdx, cond);
+    } catch {}
+  }
+
+  function handleChoiceTrustCondEdit(cIdx: number, condJson: string) {
+    if (!node) return;
+    try {
+      const cond = condJson.trim() ? JSON.parse(condJson) : undefined;
+      updateChoiceTrustCondition(node.id, cIdx, cond);
+    } catch {}
+  }
+
+  function handleChoiceMemCondEdit(cIdx: number, condJson: string) {
+    if (!node) return;
+    try {
+      const cond = condJson.trim() ? JSON.parse(condJson) : undefined;
+      updateChoiceMemoryCondition(node.id, cIdx, cond);
+    } catch {}
+  }
+
+  function handleNodeTrustEffectEdit(effectJson: string) {
+    if (!node) return;
+    try {
+      const effect = effectJson.trim() ? JSON.parse(effectJson) : undefined;
+      updateNodeTrustEffect(node.id, effect);
+    } catch {}
+  }
 
   function handleNodeUpdate(field: string, value: any) {
     if (!node) return;
@@ -486,12 +549,207 @@
                     placeholder={'{"key": "value"}'}
                   />
                 </div>
+                <div class="form-item">
+                  <label>变量条件 condition (JSON)</label>
+                  <input
+                    type="text"
+                    value={choice.condition ? JSON.stringify(choice.condition) : ''}
+                    on:input={(e) => handleChoiceConditionEdit(cIdx, inputValue(e))}
+                    class="input mono"
+                    placeholder={'{"clue_count": 3}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>信任条件 trustCondition (JSON)</label>
+                  <input
+                    type="text"
+                    value={choice.trustCondition ? JSON.stringify(choice.trustCondition) : ''}
+                    on:input={(e) => handleChoiceTrustCondEdit(cIdx, inputValue(e))}
+                    class="input mono"
+                    placeholder={'{"crewRequirements": [{"memberId":"suboshi","minLevel":"trust"}]}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>记忆条件 memoryCondition (JSON)</label>
+                  <input
+                    type="text"
+                    value={choice.memoryCondition ? JSON.stringify(choice.memoryCondition) : ''}
+                    on:input={(e) => handleChoiceMemCondEdit(cIdx, inputValue(e))}
+                    class="input mono"
+                    placeholder={'{"playthroughAtLeast": 2, "requiredClues": ["previous_incident"]}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>记忆文本（二周目替换文本）</label>
+                  <input
+                    type="text"
+                    value={choice.memoryText || ''}
+                    on:input={(e) => handleUpdateChoice(cIdx, 'memoryText', inputValue(e) || undefined)}
+                    class="input"
+                    placeholder="二周目显示的替代选项文本"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>记忆效果 memoryEffect (JSON)</label>
+                  <input
+                    type="text"
+                    value={choice.memoryEffect ? JSON.stringify(choice.memoryEffect) : ''}
+                    on:input={(e) => {
+                      const val = inputValue(e);
+                      try {
+                        handleUpdateChoice(cIdx, 'memoryEffect', val ? JSON.parse(val) : undefined);
+                      } catch {}
+                    }}
+                    class="input mono"
+                    placeholder={'{"clueToUnlock": "some_clue_id"}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>信任效果 trustEffect (JSON)</label>
+                  <input
+                    type="text"
+                    value={choice.trustEffect ? JSON.stringify(choice.trustEffect) : ''}
+                    on:input={(e) => {
+                      const val = inputValue(e);
+                      try {
+                        handleUpdateChoice(cIdx, 'trustEffect', val ? JSON.parse(val) : undefined);
+                      } catch {}
+                    }}
+                    class="input mono"
+                    placeholder={'{"changes": [{"target":"suboshi","value":10,"reason":"信任增加"}]}'
+                    }
+                  />
+                </div>
               </div>
             </div>
           {/each}
         </div>
       {/if}
     </section>
+
+    {#if node}
+    <section class="panel">
+      <div class="panel-header">
+        <h3>🔀 分支导航 (nextNodeBranches)</h3>
+        <button class="btn btn-sm" on:click={handleAddBranch}>+ 添加分支</button>
+      </div>
+      <p class="hint">分支按优先级从高到低判断，第一个满足条件的分支将被执行。若无条件则直接跳转。</p>
+      {#if branches.length > 0}
+        <div class="branch-list">
+          {#each branches as branch, bIdx}
+            <div class="branch-item">
+              <div class="branch-header">
+                <span class="branch-index">分支 #{bIdx + 1}</span>
+                <button class="btn btn-sm btn-danger" on:click={() => handleDeleteBranch(bIdx)}>✕</button>
+              </div>
+              <div class="branch-body">
+                <div class="form-item">
+                  <label>目标节点</label>
+                  <select
+                    value={branch.nextNodeId || ''}
+                    on:change={(e) => handleUpdateBranch(bIdx, 'nextNodeId', selectValue(e))}
+                    class="input"
+                  >
+                    <option value="">— 请选择 —</option>
+                    {#each get(nodeOptions) as opt}
+                      <option value={opt.id}>{opt.label}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div class="form-item">
+                  <label>优先级（数值越高越优先）</label>
+                  <input
+                    type="number"
+                    value={branch.priority ?? 0}
+                    on:input={(e) => handleUpdateBranch(bIdx, 'priority', inputNumber(e))}
+                    class="input"
+                  />
+                </div>
+                <div class="form-item">
+                  <label>变量条件 condition (JSON)</label>
+                  <input
+                    type="text"
+                    value={branch.condition ? JSON.stringify(branch.condition) : ''}
+                    on:input={(e) => {
+                      const val = inputValue(e);
+                      try {
+                        handleUpdateBranch(bIdx, 'condition', val.trim() ? JSON.parse(val) : undefined);
+                      } catch {}
+                    }}
+                    class="input mono"
+                    placeholder={'{"clue_count": 3}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>信任条件 trustCondition (JSON)</label>
+                  <input
+                    type="text"
+                    value={branch.trustCondition ? JSON.stringify(branch.trustCondition) : ''}
+                    on:input={(e) => {
+                      const val = inputValue(e);
+                      try {
+                        handleUpdateBranch(bIdx, 'trustCondition', val.trim() ? JSON.parse(val) : undefined);
+                      } catch {}
+                    }}
+                    class="input mono"
+                    placeholder={'{"crewRequirements": [{"memberId":"suboshi","minLevel":"trust"}]}'}
+                  />
+                </div>
+                <div class="form-item">
+                  <label>记忆条件 memoryCondition (JSON)</label>
+                  <input
+                    type="text"
+                    value={branch.memoryCondition ? JSON.stringify(branch.memoryCondition) : ''}
+                    on:input={(e) => {
+                      const val = inputValue(e);
+                      try {
+                        handleUpdateBranch(bIdx, 'memoryCondition', val.trim() ? JSON.parse(val) : undefined);
+                      } catch {}
+                    }}
+                    class="input mono"
+                    placeholder={'{"playthroughAtLeast": 2, "requiredClues": ["previous_incident"]}'}
+                  />
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <p class="empty-hint">暂无分支，点击"添加分支"创建条件跳转。</p>
+      {/if}
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h3>🤝 节点信任效果 (trustEffect)</h3>
+      </div>
+      <p class="hint">到达此节点时自动触发的信任变化，影响角色关系和结局权重。</p>
+      <div class="form-item">
+        <label>trustEffect (JSON)</label>
+        <textarea
+          value={node.trustEffect ? JSON.stringify(node.trustEffect, null, 2) : ''}
+          on:input={(e) => handleNodeTrustEffectEdit(textareaValue(e))}
+          class="input mono"
+          rows="6"
+          placeholder={'{\n  "changes": [\n    {"target": "suboshi", "value": 10, "reason": "信任增加"},\n    {"target": "natsume", "value": -5, "reason": "怀疑增加"}\n  ]\n}'}
+        ></textarea>
+      </div>
+      {#if node.trustEffect?.changes}
+        <div class="trust-preview">
+          <h4>效果预览</h4>
+          {#each node.trustEffect.changes as ch}
+            <div class="trust-change-item">
+              <span class="crew-name">{crewMembers.find(c => c.id === ch.target)?.name || ch.target}</span>
+              <span class="trust-value" class:positive={ch.value > 0} class:negative={ch.value < 0}>
+                {ch.value > 0 ? '+' : ''}{ch.value}
+              </span>
+              <span class="trust-reason">{ch.reason || ''}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+    {/if}
   </div>
 {/if}
 
@@ -941,5 +1199,125 @@
     font-size: 0.75rem;
     color: #5a8aaa;
     flex: 1;
+  }
+
+  .branch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .branch-item {
+    background: rgba(0, 80, 120, 0.15);
+    border: 1px solid rgba(0, 160, 200, 0.2);
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .branch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .branch-index {
+    font-weight: 700;
+    color: #00c8e0;
+    font-size: 0.9rem;
+  }
+
+  .branch-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .branch-body .form-item {
+    grid-column: span 1;
+  }
+
+  .branch-body .form-item:nth-child(n+3) {
+    grid-column: span 2;
+  }
+
+  .hint {
+    font-size: 0.78rem;
+    color: #5a8aaa;
+    margin: 4px 0 8px;
+  }
+
+  .empty-hint {
+    font-size: 0.85rem;
+    color: #3a6a8a;
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .trust-preview {
+    margin-top: 10px;
+    background: rgba(0, 60, 100, 0.2);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+
+  .trust-preview h4 {
+    font-size: 0.8rem;
+    color: #5a8aaa;
+    margin: 0 0 8px;
+  }
+
+  .trust-change-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 0.85rem;
+  }
+
+  .crew-name {
+    color: #00c8e0;
+    font-weight: 600;
+    min-width: 60px;
+  }
+
+  .trust-value {
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+
+  .trust-value.positive {
+    color: #4ade80;
+  }
+
+  .trust-value.negative {
+    color: #f87171;
+  }
+
+  .trust-reason {
+    color: #8aa0b8;
+    font-size: 0.8rem;
+  }
+
+  .panel {
+    margin-bottom: 24px;
+    background: #0d1525;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .panel-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #c0d8e8;
   }
 </style>

@@ -9,7 +9,13 @@ import type {
   BGMType,
   MoodType,
   SFXType,
-  NextNodeBranch
+  NextNodeBranch,
+  StateCondition,
+  TrustCondition,
+  MemoryCondition,
+  TrustEffect,
+  CrewMemberId,
+  TrustLevel
 } from '../types/game';
 import { nodes as originalNodes, endings as originalEndings } from '../data/story';
 import { crewNodes as crewOriginalNodes, crewEndings as crewOriginalEndings } from '../data/crewStory';
@@ -452,4 +458,118 @@ export function resetToOriginal() {
 
 export function markClean() {
   editorState.update(s => ({ ...s, isDirty: false }));
+}
+
+export function addBranch(nodeId: string) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node) return s;
+    const branches = [...(node.nextNodeBranches || [])];
+    branches.push({ nextNodeId: '', priority: 0 });
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, nextNodeBranches: branches });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function updateBranch(nodeId: string, branchIndex: number, updates: Partial<NextNodeBranch>) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node?.nextNodeBranches?.[branchIndex]) return s;
+    const branches = [...node.nextNodeBranches];
+    branches[branchIndex] = { ...branches[branchIndex], ...updates };
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, nextNodeBranches: branches });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function deleteBranch(nodeId: string, branchIndex: number) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node?.nextNodeBranches) return s;
+    const branches = node.nextNodeBranches.filter((_, i) => i !== branchIndex);
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, nextNodeBranches: branches.length > 0 ? branches : undefined });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function updateChoiceCondition(nodeId: string, choiceIndex: number, condition: StateCondition | undefined) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node?.choices?.[choiceIndex]) return s;
+    const choices = [...node.choices];
+    choices[choiceIndex] = { ...choices[choiceIndex], condition };
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, choices });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function updateChoiceTrustCondition(nodeId: string, choiceIndex: number, trustCondition: TrustCondition | undefined) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node?.choices?.[choiceIndex]) return s;
+    const choices = [...node.choices];
+    choices[choiceIndex] = { ...choices[choiceIndex], trustCondition };
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, choices });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function updateChoiceMemoryCondition(nodeId: string, choiceIndex: number, memoryCondition: MemoryCondition | undefined) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node?.choices?.[choiceIndex]) return s;
+    const choices = [...node.choices];
+    choices[choiceIndex] = { ...choices[choiceIndex], memoryCondition };
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, choices });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export function updateNodeTrustEffect(nodeId: string, trustEffect: TrustEffect | undefined) {
+  editorState.update(s => {
+    const node = s.editedNodes.get(nodeId);
+    if (!node) return s;
+    const newMap = new Map(s.editedNodes);
+    newMap.set(nodeId, { ...node, trustEffect });
+    return { ...s, editedNodes: newMap, isDirty: true };
+  });
+}
+
+export const crewMembers: { id: CrewMemberId; name: string; role: string }[] = [
+  { id: 'ahai', name: '阿海', role: '主播' },
+  { id: 'xiaolin', name: '小林', role: '摄影师' },
+  { id: 'laozhou', name: '老周', role: '工程师' },
+  { id: 'suboshi', name: '苏博士', role: '生物学家' }
+];
+
+export const trustLevels: TrustLevel[] = ['hostile', 'distrust', 'neutral', 'trust', 'loyal'];
+
+export const trustLevelLabels: Record<TrustLevel, string> = {
+  hostile: '敌对',
+  distrust: '怀疑',
+  neutral: '中立',
+  trust: '信任',
+  loyal: '忠诚'
+};
+
+export function collectAllVariables(): string[] {
+  const $state = get(editorState);
+  const varSet = new Set<string>();
+  $state.editedNodes.forEach(node => {
+    if (node.effects) Object.keys(node.effects).forEach(k => varSet.add(k));
+    if (node.choices) node.choices.forEach(c => {
+      if (c.effect) Object.keys(c.effect).forEach(k => varSet.add(k));
+      if (c.condition) Object.keys(c.condition).forEach(k => varSet.add(k));
+    });
+    if (node.nextNodeBranches) node.nextNodeBranches.forEach(b => {
+      if (b.condition) Object.keys(b.condition).forEach(k => varSet.add(k));
+    });
+  });
+  return Array.from(varSet).sort();
 }

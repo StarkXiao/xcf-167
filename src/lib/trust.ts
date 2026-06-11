@@ -41,7 +41,7 @@ const TRUST_MIN = -100;
 const TRUST_MAX = 100;
 const NOTIFICATION_DURATION = 3000;
 
-function getTrustLevel(value: number): TrustLevel {
+export function getTrustLevel(value: number): TrustLevel {
   if (value <= -60) return 'hostile';
   if (value <= -20) return 'distrust';
   if (value <= 20) return 'neutral';
