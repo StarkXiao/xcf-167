@@ -17,8 +17,9 @@ import {
   getSubtitleChallenge
 } from '../data/signalAnalysis';
 import { setVariable } from './store';
-import { addEndingWeightModifier, collectEvidence } from './evidence';
+import { addEndingWeightModifier, collectEvidence, applyEndingWeightModifiers } from './evidence';
 import { playSFX } from './audio';
+import { goToNode } from './engine';
 
 function createInitialProgress(
   challenges: { id: string }[],
@@ -53,7 +54,8 @@ function createInitialState(): SignalAnalysisState {
       noise: false,
       subtitle: false
     },
-    hubTriggered: false
+    hubTriggered: false,
+    pendingStoryNode: null
   };
 }
 
@@ -191,6 +193,15 @@ export function closeSignalHub(): void {
   playSFX('click');
 }
 
+export function consumePendingStoryNode(): string | null {
+  const state = get(signalAnalysis);
+  const pending = state.pendingStoryNode;
+  if (pending) {
+    signalAnalysis.update(s => ({ ...s, pendingStoryNode: null }));
+  }
+  return pending;
+}
+
 export function selectModule(module: SignalAnalysisModule): void {
   signalAnalysis.update(state => ({
     ...state,
@@ -318,7 +329,6 @@ function applyRewards(
     subtitle: subtitleChallenges.findIndex(c => c.id === challengeId)
   };
 
-  const progressArrKey = `${module}Progress` as const;
   const nextIndex = indexMap[module] + 1;
   const challengesArr =
     module === 'sonar' ? sonarChallenges :
@@ -327,6 +337,48 @@ function applyRewards(
 
   if (nextIndex < challengesArr.length) {
     unlockProgress(module, challengesArr[nextIndex].id);
+  }
+
+  const state = get(signalAnalysis);
+  const moduleProgress =
+    module === 'sonar' ? state.sonarProgress :
+    module === 'noise' ? state.noiseProgress :
+    state.subtitleProgress;
+
+  const allModuleCompleted = moduleProgress.every(p => p.status === 'completed');
+  if (allModuleCompleted) {
+    const completionNodeId: Record<SignalAnalysisModule, string> = {
+      sonar: 'signal_sonar_complete',
+      noise: 'signal_noise_complete',
+      subtitle: 'signal_subtitle_complete'
+    };
+
+    signalAnalysis.update(s => ({
+      ...s,
+      pendingStoryNode: completionNodeId[module]
+    }));
+  }
+
+  const allCompleted = [
+    ...state.sonarProgress,
+    ...state.noiseProgress,
+    ...state.subtitleProgress
+  ].every(p => p.status === 'completed');
+
+  if (allCompleted) {
+    applyEndingWeightModifiers(
+      [
+        { endingId: 'ending_truth', weight: 20 },
+        { endingId: 'ending_survival', weight: 15 },
+        { endingId: 'ending_conspiracy', weight: 10 }
+      ],
+      'signal_analysis_all_complete'
+    );
+
+    signalAnalysis.update(s => ({
+      ...s,
+      pendingStoryNode: 'signal_all_complete'
+    }));
   }
 }
 

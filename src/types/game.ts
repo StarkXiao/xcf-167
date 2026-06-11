@@ -982,6 +982,7 @@ export interface SignalAnalysisState {
   totalScore: number;
   modulesUnlocked: Record<SignalAnalysisModule, boolean>;
   hubTriggered: boolean;
+  pendingStoryNode: string | null;
 }
 
 export interface SignalAnalysisReward {

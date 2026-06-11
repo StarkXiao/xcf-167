@@ -29,7 +29,9 @@ export const endings: Ending[] = [
   { id: 'ending_survival', title: '幸存者', description: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。', isGood: true },
   { id: 'ending_silence', title: '永远的沉默', description: '潜艇最终消失在了马里亚纳海沟的最深处。没有人知道那天深海里到底发生了什么，只留下一段被截断的直播录像。', isGood: false },
   { id: 'ending_madness', title: '深渊回响', description: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？', isGood: false },
-  { id: 'ending_loop', title: '无尽回放', description: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。', isGood: false }
+  { id: 'ending_loop', title: '无尽回放', description: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。', isGood: false },
+  { id: 'ending_conspiracy', title: '阴谋浮现', description: '信号解析揭开了冰山一角——这不是科考任务，而是一场精心策划的围猎。而猎物，不仅仅是深海中的那个东西。', isGood: false },
+  { id: 'ending_betrayal', title: '背叛者', description: '协议07的真相浮出水面：有人从一开始就知道一切。当你将证据指向那个方向时，你发现——背叛者比你想的更近。', isGood: false }
 ];
 
 export const nodes: StoryNode[] = [

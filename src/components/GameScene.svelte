@@ -15,6 +15,11 @@
   import AnonymousNotification from './AnonymousNotification.svelte';
   import SignalAnalysisHub from './SignalAnalysisHub.svelte';
   import {
+    signalAnalysis,
+    closeSignalHub,
+    consumePendingStoryNode
+  } from '../lib/signalAnalysis';
+  import {
     gameState,
     activeDanmakus,
     isTyping,
@@ -178,6 +183,12 @@
       }
       if (currentNode.id === 'early_sign') {
         setCanOpenBoard(true);
+      }
+      if (!currentNode.customInterface) {
+        const saState = get(signalAnalysis);
+        if (saState.isHubOpen) {
+          closeSignalHub();
+        }
       }
       checkAndTriggerMessages({
         nodeId: currentNode.id,
@@ -393,6 +404,16 @@
 
   function handleMenuClose() {
     showGameMenu = false;
+  }
+
+  function handleSignalHubClose() {
+    closeSignalHub();
+    playSFX('select');
+    const pendingNode = consumePendingStoryNode();
+    if (pendingNode) {
+      goToNode(pendingNode);
+      updateState();
+    }
   }
 
   function handleLoadSlot(slot: SaveSlot) {
@@ -776,8 +797,8 @@
   <TerminalLog />
   <AnonymousNotification />
 
-  {#if currentNode?.customInterface === 'SignalAnalysisHub'}
-    <SignalAnalysisHub onClose={() => { playSFX('select'); }} />
+  {#if currentNode?.customInterface === 'SignalAnalysisHub' || $signalAnalysis.isHubOpen}
+    <SignalAnalysisHub onClose={handleSignalHubClose} />
   {/if}
 
   {#if showRewindPanel}

@@ -190,7 +190,7 @@
 
         <div class="input-section">
           <label for="input-{error.id}">
-            填入正确文字 <span class="hint">(高亮 <span class="hl-marker">** **</span> 中的错误部分)
+            填入正确文字 <span class="hint">(高亮 <span class="hl-marker">** **</span> 中的错误部分)</span>
           </label>
           <div class="input-row">
             <input

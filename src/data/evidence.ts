@@ -398,7 +398,9 @@ export const baseEndingWeights: Record<string, number> = {
   ending_survival: 20,
   ending_silence: 25,
   ending_madness: 15,
-  ending_loop: 20
+  ending_loop: 20,
+  ending_conspiracy: 10,
+  ending_betrayal: 10
 };
 
 // ============ 异常信号解析支线证据 ============
