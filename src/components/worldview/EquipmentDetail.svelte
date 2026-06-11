@@ -1,9 +1,12 @@
 <script lang="ts">
   import type { EquipmentLog } from '../../types/game';
   import { playSFX } from '../../lib/audio';
+  import RelationNav from './RelationNav.svelte';
 
   export let node: EquipmentLog;
   export let onBack: () => void;
+  export let unlockedIds: string[] = [];
+  export let onNavigate: (node: any) => void = () => {};
 
   function handleBack() {
     playSFX('click');
@@ -126,6 +129,8 @@
       </div>
     </div>
   {/if}
+
+  <RelationNav currentNode={node} {unlockedIds} onNavigate={onNavigate} />
 </div>
 
 <style>

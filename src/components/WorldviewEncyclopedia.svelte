@@ -11,6 +11,7 @@
   import {
     worldviewState,
     toggleCategory,
+    toggleNodeExpand,
     selectNode,
     selectTab,
     getUnlockedNodeIds,
@@ -24,6 +25,7 @@
   import ChronologyDetail from './worldview/ChronologyDetail.svelte';
   import ChronologyView from './worldview/ChronologyView.svelte';
   import KnowledgeTreeSidebar from './worldview/KnowledgeTreeSidebar.svelte';
+  import RelationNav from './worldview/RelationNav.svelte';
 
   export let isOpen = false;
   export let onClose: () => void = () => {};
@@ -53,9 +55,14 @@
     toggleCategory(cat);
   }
 
+  function handleToggleNode(nodeId: string) {
+    toggleNodeExpand(nodeId);
+  }
+
   $: activeTab = $worldviewState.activeTab as TabType;
   $: selectedNodeId = $worldviewState.selectedNodeId;
   $: expandedCategories = $worldviewState.expandedCategories;
+  $: expandedNodeIds = $worldviewState.expandedNodeIds;
   $: unlockedIds = getUnlockedNodeIds();
   $: selectedNode = selectedNodeId ? allWorldviewNodes.find(n => n.id === selectedNodeId) : null;
 
@@ -127,22 +134,22 @@
           <div class="tree-panel">
             <KnowledgeTreeSidebar
               {selectedNodeId}
-              {expandedCategories}
+              expandedNodeIds={expandedNodeIds}
               {unlockedIds}
               onSelect={handleSelectNode}
-              onToggle={handleToggleCategory}
+              onToggleExpand={handleToggleNode}
             />
           </div>
           <div class="detail-panel">
             {#if selectedNode}
               {#if selectedNode.category === 'creature'}
-                <CreatureDetail node={selectedNode} onBack={handleBackToList} />
+                <CreatureDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
               {:else if selectedNode.category === 'equipment'}
-                <EquipmentDetail node={selectedNode} onBack={handleBackToList} />
+                <EquipmentDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
               {:else if selectedNode.category === 'mail'}
-                <MailDetail node={selectedNode} onBack={handleBackToList} />
+                <MailDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
               {:else if selectedNode.category === 'chronology'}
-                <ChronologyDetail node={selectedNode} onBack={handleBackToList} />
+                <ChronologyDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
               {/if}
             {:else}
               <div class="empty-state">
@@ -161,13 +168,13 @@
         />
       {:else if selectedNode}
         {#if selectedNode.category === 'creature'}
-          <CreatureDetail node={selectedNode} onBack={handleBackToList} />
+          <CreatureDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
         {:else if selectedNode.category === 'equipment'}
-          <EquipmentDetail node={selectedNode} onBack={handleBackToList} />
+          <EquipmentDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
         {:else if selectedNode.category === 'mail'}
-          <MailDetail node={selectedNode} onBack={handleBackToList} />
+          <MailDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
         {:else if selectedNode.category === 'chronology'}
-          <ChronologyDetail node={selectedNode} onBack={handleBackToList} />
+          <ChronologyDetail node={selectedNode} onBack={handleBackToList} {unlockedIds} onNavigate={handleSelectNode} />
         {/if}
       {:else}
         <ListView

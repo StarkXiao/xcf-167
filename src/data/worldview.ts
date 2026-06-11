@@ -24,7 +24,9 @@ export const creatureProfiles: CreatureProfile[] = [
     firstSighted: '2047-06-12 · 00:45',
     physicalDescription: '群体长度可达数十米，呈半透明凝胶状，触手带有刺细胞。生物荧光器官沿身体对称分布。',
     behavioralNotes: '以浮游生物和小型鱼类为食，通常不主动攻击大型目标。其荧光可能用于诱捕猎物或群体间通讯。',
-    tags: ['深海生物', '生物荧光', '群落生物']
+    tags: ['深海生物', '生物荧光', '群落生物'],
+    parentNodeId: 'chrono_abyss_mission',
+    relatedNodeIds: ['equip_sonar_system', 'equip_camera_system']
   },
   {
     id: 'creature_anomaly_alpha',
@@ -42,7 +44,9 @@ export const creatureProfiles: CreatureProfile[] = [
     physicalDescription: '声呐回波显示其体积约为深渊号的3倍，整体呈流线型。具体形态未知。',
     behavioralNotes: '持续接近潜水器，移动速度缓慢但稳定，没有表现出攻击或逃避意图。',
     tags: ['不明生物', '声呐异常', '首次接触'],
-    requiresClues: ['clue_early']
+    requiresClues: ['clue_early'],
+    parentNodeId: 'creature_siphonophorae',
+    relatedNodeIds: ['equip_sonar_system', 'chrono_creature_sighting']
   },
   {
     id: 'creature_anomaly_beta',
@@ -60,7 +64,9 @@ export const creatureProfiles: CreatureProfile[] = [
     physicalDescription: '画面增强后显示轮廓具有几何对称性，边缘呈锐角而非生物曲线。',
     behavioralNotes: '在潜水器灯光范围边缘移动，似乎在规避直接照射，但又不愿远离。',
     tags: ['视觉目击', '几何轮廓', '规避行为'],
-    requiresClues: ['saw_creature']
+    requiresClues: ['saw_creature'],
+    parentNodeId: 'creature_anomaly_alpha',
+    relatedNodeIds: ['equip_camera_system', 'chrono_abyss_mission']
   },
   {
     id: 'creature_anomaly_gamma',
@@ -78,7 +84,9 @@ export const creatureProfiles: CreatureProfile[] = [
     physicalDescription: '整体呈流线型，表面有工业焊接痕迹。"眼部"结构被确认为光学观测镜头，尺寸约为成年人身高的两倍。编号开头为PROJECT。',
     behavioralNotes: '在被强光照射后静止不动，持续观测潜水器内部。对潜水器的动作有即时反应，显示其具备实时感知能力。在特定频率信号刺激下会产生后退反应。',
     tags: ['人造观测体', '协议07', '验收机制', '机械生物'],
-    requiresClues: ['clue_creature', 'clue_creature_artificial']
+    requiresClues: ['clue_creature', 'clue_creature_artificial'],
+    parentNodeId: 'creature_anomaly_beta',
+    relatedNodeIds: ['equip_protocol_module', 'chrono_pioneer_incident']
   },
   {
     id: 'creature_protocol_link',
@@ -94,7 +102,9 @@ export const creatureProfiles: CreatureProfile[] = [
     physicalDescription: '生物机械混合结构。外壳疑似采用深海生物组织与金属合金复合工艺制造，内部核心为人造观测与计算系统。',
     behavioralNotes: '其行为模式符合自动化观测程序特征。后退反应可能基于协议频率触发的优先级指令。在直播关闭后可能因"观测目标消失"而终止接触。',
     tags: ['协议07', '验收机制', '生物机械', '核心真相'],
-    requiresClues: ['clue_acceptance_mechanism', 'full_truth']
+    requiresClues: ['clue_acceptance_mechanism', 'full_truth'],
+    parentNodeId: 'creature_anomaly_gamma',
+    relatedNodeIds: ['equip_protocol_module', 'chrono_project_init', 'mail_su_agreement']
   }
 ];
 
@@ -120,7 +130,9 @@ export const equipmentLogs: EquipmentLog[] = [
       '动力系统': '固态电池组 + 螺旋桨推进',
       '外壳材质': '钛合金 + 纳米陶瓷复合层'
     },
-    tags: ['潜水器', '深渊号', '主装备']
+    tags: ['潜水器', '深渊号', '主装备'],
+    parentNodeId: 'chrono_abyss_mission',
+    relatedNodeIds: ['chrono_pioneer_incident', 'mail_recruitment_ahai']
   },
   {
     id: 'equip_abyss_id',
@@ -140,7 +152,9 @@ export const equipmentLogs: EquipmentLog[] = [
       '改装内容': '外拍摄像系统升级、AI观测系统加装、协议07响应模块植入'
     },
     tags: ['编号异常', '先驱者号', '机密改装'],
-    requiresClues: ['clue_danmaku_deep']
+    requiresClues: ['clue_danmaku_deep'],
+    parentNodeId: 'equip_abyss_sub',
+    relatedNodeIds: ['chrono_abyss_rebuild', 'chrono_pioneer_incident']
   },
   {
     id: 'equip_escape_pod',
@@ -161,7 +175,9 @@ export const equipmentLogs: EquipmentLog[] = [
       '设计者/安装者': '老周（私自改装）'
     },
     tags: ['紧急上浮', '老周的后手', '私自改装'],
-    requiresClues: ['clue_engineer_secret']
+    requiresClues: ['clue_engineer_secret'],
+    parentNodeId: 'equip_abyss_sub',
+    relatedNodeIds: ['mail_zhou_family', 'mail_zhou_retirement']
   },
   {
     id: 'equip_sonar_system',
@@ -185,7 +201,9 @@ export const equipmentLogs: EquipmentLog[] = [
       { date: '2047-06-12 · 01:15', entry: '首次检测到异常回波，频率特征未匹配数据库记录。' },
       { date: '2047-06-12 · 02:20', entry: '近距离接触后系统过载，开始出现间歇性失效。' }
     ],
-    tags: ['声呐', '异常回波', '电磁干扰']
+    tags: ['声呐', '异常回波', '电磁干扰'],
+    parentNodeId: 'equip_abyss_sub',
+    relatedNodeIds: ['creature_anomaly_alpha', 'creature_anomaly_gamma']
   },
   {
     id: 'equip_camera_system',
@@ -206,7 +224,9 @@ export const equipmentLogs: EquipmentLog[] = [
       '数据传输': '光纤直连 + 无线备份'
     },
     operatorId: 'xiaolin',
-    tags: ['直播系统', '摄像机', '小林']
+    tags: ['直播系统', '摄像机', '小林'],
+    parentNodeId: 'equip_abyss_sub',
+    relatedNodeIds: ['creature_anomaly_beta', 'creature_anomaly_gamma', 'mail_recruitment_ahai']
   },
   {
     id: 'equip_protocol_module',
@@ -226,7 +246,9 @@ export const equipmentLogs: EquipmentLog[] = [
       '有效范围': '约300m（水下）'
     },
     tags: ['协议07', '加密装置', '验收机制'],
-    requiresClues: ['clue_protocol07', 'clue_previous_incident']
+    requiresClues: ['clue_protocol07', 'clue_previous_incident'],
+    parentNodeId: 'equip_abyss_id',
+    relatedNodeIds: ['creature_protocol_link', 'chrono_project_init', 'mail_su_agreement']
   }
 ];
 
@@ -244,7 +266,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     icon: '📨',
     order: 1,
     securityLevel: 'internal',
-    tags: ['合作邀请', '阿海', '商业机密']
+    tags: ['合作邀请', '阿海', '商业机密'],
+    parentNodeId: 'chrono_crew_recruit',
+    relatedNodeIds: ['equip_abyss_sub', 'chrono_abyss_mission']
   },
   {
     id: 'mail_contract_clause',
@@ -260,7 +284,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     order: 2,
     securityLevel: 'restricted',
     tags: ['协议07', '合同', '阿海'],
-    requiresClues: ['clue_protocol07']
+    requiresClues: ['clue_protocol07'],
+    parentNodeId: 'mail_recruitment_ahai',
+    relatedNodeIds: ['equip_protocol_module', 'creature_protocol_link']
   },
   {
     id: 'mail_zhou_family',
@@ -277,7 +303,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     securityLevel: 'public',
     threadId: 'thread_family_zhou',
     tags: ['老周', '家人', '担忧'],
-    requiresClues: ['clue_danmaku_deep']
+    requiresClues: ['clue_danmaku_deep'],
+    parentNodeId: 'chrono_crew_recruit',
+    relatedNodeIds: ['equip_escape_pod', 'chrono_pioneer_incident']
   },
   {
     id: 'mail_su_agreement',
@@ -293,7 +321,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     order: 4,
     securityLevel: 'classified',
     tags: ['苏博士', '协议07', '先驱者号', '威胁'],
-    requiresClues: ['clue_previous_incident', 'clue_protocol07']
+    requiresClues: ['clue_previous_incident', 'clue_protocol07'],
+    parentNodeId: 'chrono_pioneer_incident',
+    relatedNodeIds: ['creature_protocol_link', 'equip_protocol_module', 'chrono_project_init']
   },
   {
     id: 'mail_zhou_retirement',
@@ -309,7 +339,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     order: 5,
     securityLevel: 'internal',
     threadId: 'thread_retirement_zhou',
-    tags: ['老周', '退休', '被拒绝']
+    tags: ['老周', '退休', '被拒绝'],
+    parentNodeId: 'chrono_crew_recruit',
+    relatedNodeIds: ['equip_escape_pod', 'mail_zhou_family']
   },
   {
     id: 'mail_zhou_retirement_reply',
@@ -326,7 +358,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     securityLevel: 'internal',
     replyToMailId: 'mail_zhou_retirement',
     threadId: 'thread_retirement_zhou',
-    tags: ['老周', '退休', '被拒绝', '强制留任']
+    tags: ['老周', '退休', '被拒绝', '强制留任'],
+    parentNodeId: 'mail_zhou_retirement',
+    relatedNodeIds: ['chrono_abyss_mission', 'equip_escape_pod']
   },
   {
     id: 'mail_anonymous_data',
@@ -342,7 +376,9 @@ export const mailCorrespondences: MailCorrespondence[] = [
     order: 7,
     securityLevel: 'classified',
     attachments: ['DEEP-2047-0612_FULL_RAW.zip.enc'],
-    tags: ['你', '匿名发送者', '完整数据', '游戏开端']
+    tags: ['你', '匿名发送者', '完整数据', '游戏开端'],
+    parentNodeId: 'chrono_you_receive',
+    relatedNodeIds: ['chrono_abyss_mission', 'chrono_coverup']
   }
 ];
 
@@ -359,7 +395,8 @@ export const chronologyEvents: ChronologyEvent[] = [
     location: '深海探索公司 · 总部',
     eventType: 'research',
     involvedParties: ['深海探索公司', '协议07项目组'],
-    tags: ['项目起源', '协议07', '公司背景']
+    tags: ['项目起源', '协议07', '公司背景'],
+    relatedNodeIds: ['equip_protocol_module', 'creature_protocol_link']
   },
   {
     id: 'chrono_creature_sighting',
@@ -374,7 +411,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     depth: '8,500m',
     eventType: 'discovery',
     involvedParties: ['探索者-VII无人探测器'],
-    tags: ['首次目击', '深渊观测体', '无人探测器']
+    tags: ['首次目击', '深渊观测体', '无人探测器'],
+    parentNodeId: 'chrono_project_init',
+    relatedNodeIds: ['creature_anomaly_alpha']
   },
   {
     id: 'chrono_pioneer_built',
@@ -388,7 +427,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     location: '深海探索公司 · 造船厂',
     eventType: 'research',
     involvedParties: ['深海探索公司', '老周', '苏博士'],
-    tags: ['先驱者号', '建造', '秘密改装']
+    tags: ['先驱者号', '建造', '秘密改装'],
+    parentNodeId: 'chrono_creature_sighting',
+    relatedNodeIds: ['equip_abyss_id']
   },
   {
     id: 'chrono_pioneer_incident',
@@ -406,7 +447,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     involvedParties: ['先驱者号', '老周', '苏博士', '两名未公开姓名船员'],
     consequence: '2人失踪（官方宣称全部获救），先驱者号"退役"，协议07项目数据不足需二次测试。',
     tags: ['先驱者号', '事故', '首次接触', '掩盖真相'],
-    evidenceRefs: ['case_pioneer_2044']
+    evidenceRefs: ['case_pioneer_2044'],
+    parentNodeId: 'chrono_pioneer_built',
+    relatedNodeIds: ['creature_anomaly_gamma', 'equip_protocol_module', 'mail_su_agreement']
   },
   {
     id: 'chrono_abyss_rebuild',
@@ -421,7 +464,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     eventType: 'classified',
     involvedParties: ['深海探索公司', '老周', '协议07项目组'],
     tags: ['深渊号', '改装', 'AI系统', '秘密作业'],
-    requiresClues: ['clue_previous_incident']
+    requiresClues: ['clue_previous_incident'],
+    parentNodeId: 'chrono_pioneer_incident',
+    relatedNodeIds: ['equip_abyss_id', 'equip_protocol_module']
   },
   {
     id: 'chrono_crew_recruit',
@@ -434,7 +479,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     eventDate: '2047-05',
     eventType: 'operation',
     involvedParties: ['阿海', '小林', '老周', '苏博士'],
-    tags: ['船员', '招募', '任务准备']
+    tags: ['船员', '招募', '任务准备'],
+    parentNodeId: 'chrono_abyss_rebuild',
+    relatedNodeIds: ['mail_recruitment_ahai', 'mail_zhou_retirement', 'mail_zhou_family']
   },
   {
     id: 'chrono_abyss_mission',
@@ -452,7 +499,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     involvedParties: ['深渊号', '阿海', '小林', '老周', '苏博士', '深渊观测体', '2,847,291名观众'],
     consequence: '信号永久中断，4名船员失联，官方定性为"深海意外事故"。',
     evidenceRefs: ['case_abyss_2047'],
-    tags: ['深渊号', '直播任务', '第二次接触', '信号中断']
+    tags: ['深渊号', '直播任务', '第二次接触', '信号中断'],
+    parentNodeId: 'chrono_crew_recruit',
+    relatedNodeIds: ['creature_siphonophorae', 'creature_anomaly_beta', 'equip_abyss_sub', 'equip_camera_system']
   },
   {
     id: 'chrono_coverup',
@@ -466,7 +515,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     eventType: 'classified',
     involvedParties: ['深海探索公司', '公关团队'],
     consequence: '公众逐渐遗忘事件，仅有少数质疑声音被淹没。',
-    tags: ['掩盖', '公关', '官方报告']
+    tags: ['掩盖', '公关', '官方报告'],
+    parentNodeId: 'chrono_abyss_mission',
+    relatedNodeIds: ['mail_anonymous_data']
   },
   {
     id: 'chrono_you_receive',
@@ -480,7 +531,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     eventType: 'discovery',
     involvedParties: ['你（数字取证分析师）', '匿名发送者'],
     tags: ['你', '匿名邮件', '游戏开始'],
-    evidenceRefs: ['mail_anonymous_data']
+    evidenceRefs: ['mail_anonymous_data'],
+    parentNodeId: 'chrono_coverup',
+    relatedNodeIds: ['mail_anonymous_data']
   },
   {
     id: 'chrono_ai_awareness',
@@ -494,7 +547,9 @@ export const chronologyEvents: ChronologyEvent[] = [
     eventType: 'classified',
     involvedParties: ['深渊号AI系统'],
     tags: ['AI系统', '时间异常', '终极谜团'],
-    requiresClues: ['clue_loop_awareness', 'full_truth']
+    requiresClues: ['clue_loop_awareness', 'full_truth'],
+    parentNodeId: 'chrono_you_receive',
+    relatedNodeIds: ['creature_protocol_link', 'equip_protocol_module']
   }
 ];
 
@@ -505,12 +560,7 @@ export const allWorldviewNodes: WorldviewNode[] = [
   ...chronologyEvents
 ];
 
-export const worldviewKnowledgeTree: { category: WorldviewCategory; rootNodeIds: string[] }[] = [
-  { category: 'creature', rootNodeIds: ['creature_siphonophorae', 'creature_anomaly_alpha'] },
-  { category: 'equipment', rootNodeIds: ['equip_abyss_sub', 'equip_sonar_system', 'equip_camera_system'] },
-  { category: 'mail', rootNodeIds: ['mail_recruitment_ahai', 'mail_zhou_retirement', 'mail_anonymous_data'] },
-  { category: 'chronology', rootNodeIds: ['chrono_project_init', 'chrono_you_receive'] }
-];
+export const worldviewRootNodeIds: string[] = ['chrono_project_init', 'chrono_you_receive'];
 
 export function getNodesByCategory(category: WorldviewCategory): WorldviewNode[] {
   return allWorldviewNodes.filter(n => n.category === category).sort((a, b) => a.order - b.order);

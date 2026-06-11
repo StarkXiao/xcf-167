@@ -6,7 +6,8 @@ import type {
 } from '../types/game';
 import {
   allWorldviewNodes,
-  getNodeById
+  getNodeById,
+  worldviewRootNodeIds,
 } from '../data/worldview';
 import { globalMemory, unlockedClueList, currentPlaythrough } from './memory';
 import { unlockedEndings } from './store';
@@ -17,6 +18,7 @@ export interface WorldviewState {
   activeCategory: WorldviewCategory | 'all';
   selectedNodeId: string | null;
   expandedCategories: Record<WorldviewCategory, boolean>;
+  expandedNodeIds: string[];
   searchQuery: string;
 }
 
@@ -31,6 +33,7 @@ const DEFAULT_STATE: WorldviewState = {
     mail: false,
     chronology: false
   },
+  expandedNodeIds: [...worldviewRootNodeIds],
   searchQuery: ''
 };
 
@@ -122,6 +125,18 @@ export function toggleCategory(category: WorldviewCategory): void {
       [category]: !s.expandedCategories[category]
     }
   }));
+}
+
+export function toggleNodeExpand(nodeId: string): void {
+  worldviewState.update(s => {
+    const isExpanded = s.expandedNodeIds.includes(nodeId);
+    return {
+      ...s,
+      expandedNodeIds: isExpanded
+        ? s.expandedNodeIds.filter(id => id !== nodeId)
+        : [...s.expandedNodeIds, nodeId]
+    };
+  });
 }
 
 export function setSearchQuery(query: string): void {
