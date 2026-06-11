@@ -13,6 +13,7 @@
   import AnonymousMailbox from './AnonymousMailbox.svelte';
   import TerminalLog from './TerminalLog.svelte';
   import AnonymousNotification from './AnonymousNotification.svelte';
+  import SignalAnalysisHub from './SignalAnalysisHub.svelte';
   import {
     gameState,
     activeDanmakus,
@@ -29,7 +30,9 @@
     closeEvidenceBoard,
     resetEvidenceBoard,
     setCanOpenBoard,
-    collectAllEvidence
+    collectAllEvidence,
+    applyEndingWeightModifiers,
+    applyEvidenceRewards
   } from '../lib/evidence';
   import {
     getCurrentNode,
@@ -181,6 +184,16 @@
         dialogueIndex: state.dialogueIndex,
         variables: state.variables
       });
+      if (currentNode.evidenceRewards && currentNode.evidenceRewards.length > 0) {
+        applyEvidenceRewards(currentNode.evidenceRewards);
+        syncEvidenceToMemory(currentNode.id);
+      }
+      if (currentNode.clueUnlocked) {
+        unlockClueFromNode(currentNode.clueUnlocked, currentNode.id);
+      }
+      if (currentNode.endingWeightEffects && currentNode.endingWeightEffects.length > 0) {
+        applyEndingWeightModifiers(currentNode.endingWeightEffects, `node:${currentNode.id}`);
+      }
     }
 
     const varKeys = Object.keys(state.variables).sort().join(',');
@@ -762,6 +775,10 @@
   <AnonymousMailbox />
   <TerminalLog />
   <AnonymousNotification />
+
+  {#if currentNode?.customInterface === 'SignalAnalysisHub'}
+    <SignalAnalysisHub onClose={() => { playSFX('select'); }} />
+  {/if}
 
   {#if showRewindPanel}
     <div class="rewind-panel-backdrop" on:click|stopPropagation={() => { showRewindPanel = false; }}>

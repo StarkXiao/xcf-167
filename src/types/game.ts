@@ -118,6 +118,10 @@ export interface StoryNode {
   rewindCheckpointLabel?: string;
   damageEffects?: DamageEffect[];
   repairEffects?: RepairEffect[];
+  customInterface?: string;
+  evidenceRewards?: string[];
+  clueUnlocked?: string;
+  endingWeightEffects?: { endingId: string; weight: number }[];
 }
 
 export interface Ending {
@@ -868,5 +872,124 @@ export const CREW_PERSPECTIVE_CONFIG: Record<CrewPerspectiveId, CrewPerspectiveC
     sensoryFilter: 0.2
   }
 };
+
+// ============ 异常信号解析支线类型定义 ============
+
+export type SignalAnalysisModule = 'sonar' | 'noise' | 'subtitle';
+
+export type SignalDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface SonarDataPoint {
+  frequency: number;
+  intensity: number;
+  time: number;
+}
+
+export interface SonarPattern {
+  id: string;
+  name: string;
+  description: string;
+  dataPoints: SonarDataPoint[];
+  isAnomaly: boolean;
+  anomalyType?: 'biological' | 'mechanical' | 'artificial' | 'unknown';
+  matchKeywords?: string[];
+}
+
+export interface SonarChallenge {
+  id: string;
+  title: string;
+  description: string;
+  patterns: SonarPattern[];
+  targetPatternIds: string[];
+  difficulty: SignalDifficulty;
+  rewardClueId?: string;
+  rewardEvidenceId?: string;
+  endingWeightModifiers?: Record<string, number>;
+}
+
+export interface NoiseSegment {
+  id: string;
+  startTime: number;
+  endTime: number;
+  waveform: number[];
+  label: string;
+  isTarget: boolean;
+  category?: 'human' | 'machine' | 'creature' | 'interference' | 'encrypted';
+}
+
+export interface NoiseChallenge {
+  id: string;
+  title: string;
+  description: string;
+  segments: NoiseSegment[];
+  targetCategory: string;
+  targetSegmentIds: string[];
+  difficulty: SignalDifficulty;
+  hints?: string[];
+  rewardClueId?: string;
+  rewardEvidenceId?: string;
+  endingWeightModifiers?: Record<string, number>;
+}
+
+export interface SubtitleError {
+  id: string;
+  originalText: string;
+  corruptedText: string;
+  correction: string;
+  errorType: 'character_swap' | 'missing_char' | 'extra_char' | 'homophone' | 'contextual';
+  context?: string;
+  wordIndex?: number;
+}
+
+export interface SubtitleChallenge {
+  id: string;
+  title: string;
+  description: string;
+  errors: SubtitleError[];
+  speaker: string;
+  timestamp: string;
+  difficulty: SignalDifficulty;
+  hiddenMessage?: string;
+  rewardClueId?: string;
+  rewardEvidenceId?: string;
+  endingWeightModifiers?: Record<string, number>;
+}
+
+export type SignalAnalysisStatus = 'locked' | 'available' | 'in_progress' | 'completed' | 'failed';
+
+export interface SignalAnalysisProgress {
+  challengeId: string;
+  module: SignalAnalysisModule;
+  status: SignalAnalysisStatus;
+  attempts: number;
+  score: number;
+  completedAt?: number;
+  cluesUnlocked: string[];
+  evidenceCollected: string[];
+}
+
+export interface SignalAnalysisState {
+  isHubOpen: boolean;
+  activeModule: SignalAnalysisModule | null;
+  activeChallengeId: string | null;
+  sonarProgress: SignalAnalysisProgress[];
+  noiseProgress: SignalAnalysisProgress[];
+  subtitleProgress: SignalAnalysisProgress[];
+  selectedPatternIds: string[];
+  selectedSegmentIds: string[];
+  selectedErrorIds: string[];
+  currentCorrectionInput: Record<string, string>;
+  totalScore: number;
+  modulesUnlocked: Record<SignalAnalysisModule, boolean>;
+  hubTriggered: boolean;
+}
+
+export interface SignalAnalysisReward {
+  clueId?: string;
+  evidenceId?: string;
+  endingWeights?: Record<string, number>;
+  trustEffect?: TrustEffect;
+  scoreBonus?: number;
+}
 
 

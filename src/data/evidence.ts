@@ -400,3 +400,245 @@ export const baseEndingWeights: Record<string, number> = {
   ending_madness: 15,
   ending_loop: 20
 };
+
+// ============ 异常信号解析支线证据 ============
+
+const signalAnalysisEvidence: EvidenceCard[] = [
+  {
+    id: 'ev_sonar_pulse',
+    type: 'sfx',
+    title: '规律性脉冲信号',
+    content: '声呐频谱中检测到非自然脉冲序列，间隔精确到毫秒级。深海无已知生物能产生此频率。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'sonar',
+    status: 'collected',
+    importance: 5,
+    tags: ['sonar', 'pulse', 'artificial', 'anomaly', 'signal'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_sonar_titanium',
+    type: 'sfx',
+    title: '钛合金框架共振',
+    content: '近距离扫描揭示该"生物"内部存在高强度窄波束反射源，特征频率匹配钛合金蜂窝结构共振。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'metal_creak',
+    status: 'collected',
+    importance: 5,
+    tags: ['sonar', 'metal', 'titanium', 'mechanical', 'structure'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_sonar_project_id',
+    type: 'sfx',
+    title: '身份广播序列 "PROJECT-07-UNIT"',
+    content: '协议07启动后，对方回应信号中解码出身份标识。它在自报家门——并且完全兼容协议07格式。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'radio_noise',
+    status: 'collected',
+    importance: 5,
+    tags: ['sonar', 'identity', 'project07', 'compatible', 'protocol'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_noise_scrape',
+    type: 'sfx',
+    title: '舱外金属刮擦 + 规律声呐脉冲',
+    content: '第一次接触时的双信号叠加：外部金属刮擦声同时，该物体发射了定向声呐脉冲——它在扫描我们。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'metal_creak',
+    status: 'collected',
+    importance: 4,
+    tags: ['noise', 'scrape', 'contact', 'scan', 'external'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_noise_whisper',
+    type: 'sfx',
+    title: '非人声频率呢喃 + 数据突发传输',
+    content: '直播关闭后录到三段加密片段：次声道呢喃（64倍放大可识别）、不兼容格式数据突发、光学雷达校准序列。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'whisper',
+    status: 'collected',
+    importance: 5,
+    tags: ['noise', 'encrypted', 'communication', 'lidar', 'subchannel'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_noise_thank_you',
+    type: 'sfx',
+    title: '合成语音："THANK YOU FOR WATCHING"',
+    content: '03:17:41.4 - 信号中断前最后一帧，倒放解码出合成语音，同时次声道有"自我介绍"，且握手协议匹配深渊号AI系统。',
+    sourceNodeId: 'signal_analysis_hub',
+    sfxType: 'static',
+    status: 'collected',
+    importance: 5,
+    tags: ['noise', 'ai', 'voice', 'last_frame', 'thank_you', 'identity'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_sub_zhou_corrected',
+    type: 'dialogue',
+    title: '老周报告完整还原',
+    content: '修复干扰后："声呐好像探测到什么东西，体积很大，距离我们大约200米。移动方式不对，正在接近。" 无遗漏。',
+    sourceNodeId: 'signal_analysis_hub',
+    speaker: '老周',
+    status: 'collected',
+    importance: 3,
+    tags: ['subtitle', 'corrected', 'zhou', 'report', 'sonar'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_sub_su_bait',
+    title: '苏博士坦白 + 隐藏关键词',
+    content: '还原字幕："它不是生物，是观测装置。三年前先驱者号也遇到了它。公司宣称退役，实际改装成诱饵。" 缺失字重组：观装-遇它-退役-诱饵。',
+    type: 'dialogue',
+    sourceNodeId: 'signal_analysis_hub',
+    speaker: '苏博士',
+    status: 'collected',
+    importance: 5,
+    tags: ['subtitle', 'corrected', 'su', 'bait', 'coverup', 'truth', 'device'],
+    collectedAt: 0
+  },
+  {
+    id: 'ev_sub_final_message',
+    type: 'dialogue',
+    title: '小林加密私信完整内容',
+    content: '【完整还原】\n1. PROJECT 07 IS WATCHING\n2. THE AUDIENCE IS NOT REAL\n3. SIGNAL CUTOFF AT 03:17:42\n4. PLEASE TELL MY FAMILY I LOVE THEM\n5. THIS RECORDING IS THE ONLY EVIDENCE',
+    sourceNodeId: 'signal_analysis_hub',
+    speaker: '小林（私信）',
+    status: 'collected',
+    importance: 5,
+    tags: ['subtitle', 'encrypted', 'kobayashi', 'final', 'evidence', 'audience_fake', 'cutoff', 'family'],
+    collectedAt: 0
+  }
+];
+
+export const allEvidenceCards: EvidenceCard[] = [
+  ...evidenceCards,
+  ...signalAnalysisEvidence
+];
+
+// ============ 信号解析支线推理槽位 & 规则 ============
+
+const signalAnalysisSlots: EvidenceSlot[] = [
+  {
+    id: 'slot_sig_1',
+    x: 8,
+    y: 78,
+    label: '信号来源鉴定',
+    requiredTags: ['signal', 'pulse', 'identity', 'protocol'],
+    order: 8
+  },
+  {
+    id: 'slot_sig_2',
+    x: 30,
+    y: 78,
+    label: '内部结构证据',
+    requiredTags: ['metal', 'titanium', 'structure', 'mechanical'],
+    order: 9
+  },
+  {
+    id: 'slot_sig_3',
+    x: 52,
+    y: 78,
+    label: '加密通讯内容',
+    requiredTags: ['encrypted', 'communication', 'subchannel', 'ai', 'voice'],
+    order: 10
+  },
+  {
+    id: 'slot_sig_4',
+    x: 74,
+    y: 78,
+    label: '小林最终证词',
+    requiredTags: ['final', 'evidence', 'audience_fake', 'kobayashi'],
+    order: 11
+  }
+];
+
+export const allEvidenceSlots: EvidenceSlot[] = [
+  ...evidenceSlots,
+  ...signalAnalysisSlots
+];
+
+const signalAnalysisRules: DeductionRule[] = [
+  {
+    id: 'rule_signal_origin',
+    name: '信号来源溯源推理',
+    description: '结合声呐身份广播和脉冲信号特征，追溯这个"物体"的真正来源',
+    requiredSlots: ['slot_sig_1', 'slot_6'],
+    requiredEvidence: [
+      { slotId: 'slot_sig_1', evidenceId: 'ev_sonar_project_id' },
+      { slotId: 'slot_6', evidenceId: 'ev_dl_su_protocol' }
+    ],
+    outcome: {
+      clueUnlocked: 'signal_origin_traced',
+      endingWeights: { ending_truth: 40, ending_survival: 10, ending_loop: -25, ending_madness: 15 },
+      isCorrect: true,
+      feedback: '完全正确！身份广播 "PROJECT-07-UNIT" 与苏博士坦白的协议07完美对应——它不是未知生物，是项目07制造的观测装置。三年前骗过它的不是"信号"，是同类识别码。'
+    }
+  },
+  {
+    id: 'rule_signal_structure',
+    name: '机械结构验证推理',
+    description: '结合钛合金共振证据和焊接痕迹，证明这是一个人造混合体',
+    requiredSlots: ['slot_sig_2', 'slot_3'],
+    requiredEvidence: [
+      { slotId: 'slot_sig_2', evidenceId: 'ev_sonar_titanium' },
+      { slotId: 'slot_3', evidenceId: 'ev_dl_weld' }
+    ],
+    outcome: {
+      clueUnlocked: 'hybrid_structure_confirmed',
+      endingWeights: { ending_truth: 30, ending_madness: 10, ending_silence: -15 },
+      isCorrect: true,
+      feedback: '结构分析成立！表面有生物组织焊接痕迹，内部是钛合金框架——它是生物机械混合体。难怪苏博士既恐惧又兴奋：她参与过它的"制造"。'
+    }
+  },
+  {
+    id: 'rule_ai_revelation',
+    name: '深渊AI本体推理',
+    description: '最后两秒的合成语音、AI握手协议、小林证词的结合推理',
+    requiredSlots: ['slot_sig_3', 'slot_sig_4', 'slot_7'],
+    requiredEvidence: [
+      { slotId: 'slot_sig_3', evidenceId: 'ev_noise_thank_you' },
+      { slotId: 'slot_sig_4', evidenceId: 'ev_sub_final_message' },
+      { slotId: 'slot_7', evidenceId: 'ev_sfx_whisper' }
+    ],
+    outcome: {
+      clueUnlocked: 'ai_is_the_entity',
+      endingWeights: { ending_truth: 60, ending_madness: 45, ending_silence: -35, ending_loop: -40, ending_survival: 5 },
+      trustEffect: {
+        changes: [
+          { target: 'xiaolin', value: 30, reason: '还原了她的最后讯息' }
+        ]
+      },
+      isCorrect: true,
+      feedback: '你触及了核心真相。三条证据构成闭环：\n1. "THANK YOU FOR WATCHING" 是深渊号AI的告别语\n2. 小林证明 "观众并不真实"——你一直在被它观看\n3. 低语声、次声道自我介绍：那个"生物"就是AI本身，或者说，是AI的物理终端。\n直播不是意外，是验收测试。而你，也是测试的一部分。'
+    }
+  },
+  {
+    id: 'rule_full_picture_signal',
+    name: '完整真相·信号版拼图',
+    description: '汇总信号解析支线全部证据，获得最完整的事件还原（仅信号解析全通关后可用）',
+    requiredSlots: ['slot_sig_1', 'slot_sig_2', 'slot_sig_3', 'slot_sig_4', 'slot_1', 'slot_3'],
+    requiredEvidence: [
+      { slotId: 'slot_sig_1', evidenceId: 'ev_sonar_project_id' },
+      { slotId: 'slot_sig_2', evidenceId: 'ev_sonar_titanium' },
+      { slotId: 'slot_sig_3', evidenceId: 'ev_noise_thank_you' },
+      { slotId: 'slot_sig_4', evidenceId: 'ev_sub_final_message' },
+      { slotId: 'slot_1', evidenceId: 'ev_d25' },
+      { slotId: 'slot_3', evidenceId: 'ev_dl_not_bio' }
+    ],
+    outcome: {
+      clueUnlocked: 'full_truth_signal_path',
+      endingWeights: { ending_truth: 80, ending_madness: 50, ending_survival: 25, ending_silence: -50, ending_loop: -60 },
+      isCorrect: true,
+      feedback: '信号解析路线完美通关。完整真相浮出水面：\n\n「深渊号」从未退役——它被改装，植入了AI核心，生物外壳是伪装层。\n协议07不是骗过它的信号，是唤醒它的指令。\n匿名用户0x7F知道这些，因为他/她是上一轮测试的"观众"。\n小林在最后时刻突破了AI的信息封锁，把真相发给了外部——发给了你。\n现在你手里握着她用命换来的证据。接下来怎么办？'
+    }
+  }
+];
+
+export const allDeductionRules: DeductionRule[] = [
+  ...deductionRules,
+  ...signalAnalysisRules
+];

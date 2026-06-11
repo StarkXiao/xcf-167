@@ -12,7 +12,10 @@ import {
   evidenceCards,
   evidenceSlots,
   deductionRules,
-  baseEndingWeights
+  baseEndingWeights,
+  allEvidenceCards,
+  allEvidenceSlots,
+  allDeductionRules
 } from '../data/evidence';
 import { setVariable } from './store';
 import { applyTrustEffect } from './trust';
@@ -30,7 +33,7 @@ function createInitialEndingWeights(): EndingWeight[] {
 function createInitialEvidenceBoardState(): EvidenceBoardState {
   return {
     collectedEvidence: [],
-    slots: JSON.parse(JSON.stringify(evidenceSlots)),
+    slots: JSON.parse(JSON.stringify(allEvidenceSlots)),
     placedEvidence: new Map(),
     unlockedRules: [],
     completedRules: [],
@@ -71,7 +74,7 @@ export const placedEvidenceCards = derived(evidenceBoard, $board => {
 });
 
 export const availableRules = derived(evidenceBoard, $board => {
-  return deductionRules.filter(rule => {
+  return allDeductionRules.filter(rule => {
     if ($board.completedRules.includes(rule.id)) return false;
     const allSlotsFilled = rule.requiredSlots.every(slotId => {
       const evidenceId = $board.placedEvidence.get(slotId);
@@ -97,7 +100,7 @@ export const predictedEnding = derived(evidenceBoard, $board => {
 export function collectEvidence(evidenceId: string): void {
   evidenceBoard.update(state => {
     if (state.collectedEvidence.some(e => e.id === evidenceId)) return state;
-    const template = evidenceCards.find(e => e.id === evidenceId);
+    const template = allEvidenceCards.find(e => e.id === evidenceId);
     if (!template) return state;
     const newCard: EvidenceCard = {
       ...template,
@@ -112,12 +115,12 @@ export function collectEvidence(evidenceId: string): void {
 }
 
 export function collectEvidenceByNode(nodeId: string): void {
-  const cardsForNode = evidenceCards.filter(e => e.sourceNodeId === nodeId);
+  const cardsForNode = allEvidenceCards.filter(e => e.sourceNodeId === nodeId);
   cardsForNode.forEach(card => collectEvidence(card.id));
 }
 
 export function collectAllEvidence(): void {
-  evidenceCards.forEach(card => collectEvidence(card.id));
+  allEvidenceCards.forEach(card => collectEvidence(card.id));
 }
 
 export function updateEvidenceStatus(evidenceId: string, status: EvidenceStatus): void {
@@ -194,7 +197,7 @@ export function checkTagsMatch(evidence: EvidenceCard, slot: EvidenceSlot): bool
 
 export function attemptDeduction(ruleId: string): { success: boolean; feedback: string } {
   const state = get(evidenceBoard);
-  const rule = deductionRules.find(r => r.id === ruleId);
+  const rule = allDeductionRules.find(r => r.id === ruleId);
   if (!rule) return { success: false, feedback: '推理规则不存在' };
 
   const isCorrect = rule.requiredEvidence.every(({ slotId, evidenceId }) => {
@@ -280,7 +283,7 @@ export function rollbackLastDeduction(): boolean {
   if (state.history.length === 0) return false;
 
   const lastEntry = state.history[state.history.length - 1];
-  const rule = deductionRules.find(r => r.id === lastEntry.ruleId);
+  const rule = allDeductionRules.find(r => r.id === lastEntry.ruleId);
 
   evidenceBoard.update(s => {
     let newEndingWeights = s.endingWeights;
@@ -361,11 +364,11 @@ export function endDrag(): void {
 }
 
 export function getRuleById(ruleId: string) {
-  return deductionRules.find(r => r.id === ruleId);
+  return allDeductionRules.find(r => r.id === ruleId);
 }
 
 export function getAllRules() {
-  return deductionRules;
+  return allDeductionRules;
 }
 
 export function getPredictedEnding(): string | null {
@@ -399,6 +402,28 @@ export function getAllEndingWeights(): { endingId: string; weight: number; proba
       probability: Math.max(0, w.weight) / totalWeight
     }))
     .sort((a, b) => b.probability - a.probability);
+}
+
+export function applyEndingWeightModifiers(
+  modifiers: { endingId: string; weight: number }[],
+  source: string
+): void {
+  evidenceBoard.update(s => ({
+    ...s,
+    endingWeights: s.endingWeights.map(ew => {
+      const mod = modifiers.find(m => m.endingId === ew.endingId);
+      if (!mod) return ew;
+      return {
+        ...ew,
+        weight: ew.weight + mod.weight,
+        modifiers: [...ew.modifiers, { source, value: mod.weight }]
+      };
+    })
+  }));
+}
+
+export function applyEvidenceRewards(rewardIds: string[]): void {
+  rewardIds.forEach(id => collectEvidence(id));
 }
 
 export function selectWeightedEnding(candidateEndingIds?: string[]): string | null {

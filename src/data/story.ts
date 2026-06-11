@@ -460,6 +460,19 @@ export const nodes: StoryNode[] = [
           ],
           hintText: '你决定从船员的角度重新审视这一切'
         }
+      },
+      {
+        id: 'c_signal_analysis',
+        text: '启动异常信号解析系统——分析声呐图谱、噪声与字幕错误',
+        nextNodeId: 'signal_hub',
+        effect: { signal_analysis_enabled: true },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 12, reason: '关注声呐数据' },
+            { target: 'suboshi', value: 8, reason: '科学分析态度' }
+          ],
+          hintText: '老周和苏博士对你的技术分析能力印象深刻'
+        }
       }
     ],
     danmakus: [
@@ -1792,6 +1805,200 @@ export const nodes: StoryNode[] = [
     endingId: 'ending_silence',
     endingTitle: '永远的沉默',
     endingDescription: '潜艇最终消失在了马里亚纳海沟的最深处。没有人知道那天深海里到底发生了什么，只留下一段被截断的直播录像。'
+  },
+  {
+    id: 'signal_hub',
+    title: '【异常信号解析系统】',
+    background: 'terminal',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你切换到信号分析后台。屏幕上弹出三个模块：声呐图谱、噪声识别、字幕纠错。\n\n每一个模块都标记着「检测到异常」的红色警告。', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.4 }, { sfx: 'notify', delay: 800, volume: 0.3 }],
+        mood: 'tense'
+      }),
+      mkLine('老周', '（通讯频道）那边......你能帮我们看看声呐数据吗？这个信号我从来没见过。', {
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '（通讯频道）还有那段被干扰的通话记录......如果能还原出来，对我们判断情况非常重要。', {
+        mood: 'calm'
+      })
+    ],
+    choices: [
+      {
+        id: 'c_signal_back',
+        text: '返回主线剧情',
+        nextNodeId: 'analyze_crew',
+        effect: { signal_analysis_visited: true }
+      }
+    ],
+    customInterface: 'SignalAnalysisHub',
+    evidenceRewards: ['sonar_raw_data'],
+    danmakus: [
+      mkDanmaku('ds1', '技术宅观众', '哦？这个分支很有意思！', 200, 3, 1500, '#66ffff'),
+      mkDanmaku('ds2', '信号处理', '声呐频谱图？我专业啊！', 800, 4, 900, '#ffff66')
+    ]
+  },
+  {
+    id: 'signal_sonar_complete',
+    title: '【声呐图谱解析完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你完成了声呐图谱的解析。异常回波的特征逐渐清晰——那不是海洋生物，也不是地质结构。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.6 }],
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【匹配完成：人造物体 · 金属材质 · 螺旋桨痕迹】', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.5 }, { sfx: 'notify', delay: 300, volume: 0.5 }, { sfx: 'notify', delay: 600, volume: 0.5 }],
+        mood: 'mystery'
+      }),
+      mkLine('老周', '（通讯）......这不可能。我们的潜水器是当前海域唯一的人造物体。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '你想起档案室里那些被划掉的记录。\n「深渊号」退役的真正原因——难道不是设备老化？', {
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['sonar_analysis_report', 'propeller_signature'],
+    clueUnlocked: 'secret_submarine',
+    trustEffect: {
+      changes: [
+        { target: 'laozhou', value: 15, reason: '关键技术支持' },
+        { target: 'suboshi', value: 10, reason: '数据实证' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 25 },
+      { endingId: 'ending_conspiracy', weight: 20 }
+    ]
+  },
+  {
+    id: 'signal_noise_complete',
+    title: '【噪声识别完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你从背景噪声中分离出了三段独立信号。一段是金属摩擦，一段是机械运转，还有一段——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.4 }],
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【第三段信号：人声 · 已降噪处理】', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('（处理后的人声）', '「......目标已确认。按计划进入位置B。等待指令。」', {
+        sfx: [{ sfx: 'radio_noise', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '（通讯）这、这是谁的声音？我们四个全程都在直播里！', {
+        mood: 'scared'
+      }),
+      mkLine('', '潜水器上有第五个人......\n或者，海底有另一群人。', {
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['human_voice_extract', 'plan_b_reference'],
+    clueUnlocked: 'fifth_person_present',
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -10, reason: '感到被监视' },
+        { target: 'xiaolin', value: -5, reason: '恐慌' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_conspiracy', weight: 30 },
+      { endingId: 'ending_truth', weight: 15 }
+    ]
+  },
+  {
+    id: 'signal_subtitle_complete',
+    title: '【字幕纠错完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你纠正了被干扰的字幕。错误的字符背后，是被人为修改过的内容。', {
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【修正字幕：协议07真实条款】', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.5 }],
+        mood: 'mystery'
+      }),
+      mkLine('苏博士', '（通讯）......你不该看到那个的。', {
+        mood: 'calm'
+      }),
+      mkLine('', '修正后的字幕显示：\n\n「协议07第3条：如遇活体样本接触，执行清除程序。\n清除范围包括：样本、目击者......以及直播信号。」', {
+        sfx: [{ sfx: 'alarm', delay: 1000, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('小林', '（通讯）清除？！苏博士你——', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（通讯）......我也是刚刚才知道。那份协议......不是我签的。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['protocol_07_true_text', 'suboshi_innocent_hint'],
+    clueUnlocked: 'protocol_07_clearance',
+    trustEffect: {
+      changes: [
+        { target: 'suboshi', value: 20, reason: '证明其不知情' },
+        { target: 'xiaolin', value: 10, reason: '揭露真相' },
+        { target: 'laozhou', value: -10, reason: '怀疑其参与' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 30 },
+      { endingId: 'ending_betrayal', weight: 10 }
+    ]
+  },
+  {
+    id: 'signal_all_complete',
+    title: '【所有信号解析完毕】',
+    background: 'creature',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('', '三个模块全部完成。系统将结果交叉比对后，生成了最终报告。', {
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【综合结论：本次任务存在外部干预力量】\n\n1. 海域内存在第二艘人造潜艇（声呐证据）\n2. 有不明人员在场（人声证据）\n3. 任务协议被篡改（字幕证据）\n\n建议：立即中止任务，上浮避险。', {
+        sfx: [
+          { sfx: 'notify', delay: 0, volume: 0.4 },
+          { sfx: 'notify', delay: 400, volume: 0.4 },
+          { sfx: 'notify', delay: 800, volume: 0.5 }
+        ],
+        mood: 'tense'
+      }),
+      mkLine('老周', '（通讯）......我现在完全相信你了。不管那是什么，我们不该下来。', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（通讯）那个「协议07」......这不是科研项目，这是一个圈套。', {
+        mood: 'tense'
+      }),
+      mkLine('', '你将所有证据归档至证据板。\n真相的拼图，现在只差最后几块了。', {
+        mood: 'mystery'
+      })
+    ],
+    nextNodeId: 'analyze_crew',
+    evidenceRewards: ['comprehensive_report'],
+    clueUnlocked: 'external_interference',
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: 15, reason: '提供明确方向' },
+        { target: 'xiaolin', value: 15, reason: '提供明确方向' },
+        { target: 'laozhou', value: 10, reason: '数据支持' },
+        { target: 'suboshi', value: 10, reason: '数据支持' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 20 },
+      { endingId: 'ending_survival', weight: 15 },
+      { endingId: 'ending_conspiracy', weight: 10 }
+    ]
   }
 ];
 
