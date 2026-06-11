@@ -63,10 +63,24 @@ export function isNodeUnlocked(node: WorldviewNode): boolean {
   return true;
 }
 
+export function isParentUnlocked(node: WorldviewNode): boolean {
+  if (!node.parentNodeId) return true;
+  const parent = getNodeById(node.parentNodeId);
+  if (!parent) return true;
+  if (!isNodeUnlocked(parent)) return false;
+  return isParentUnlocked(parent);
+}
+
+export function canAccessNode(node: WorldviewNode): boolean {
+  if (!isNodeUnlocked(node)) return false;
+  if (!isParentUnlocked(node)) return false;
+  return true;
+}
+
 export const unlockedWorldviewNodes = derived(
   [globalMemory, unlockedEndings, currentPlaythrough],
   ([$memory, $endings, $playthrough]) => {
-    return allWorldviewNodes.filter(node => {
+    function checkConditions(node: WorldviewNode): boolean {
       if (node.requiresClues && node.requiresClues.length > 0) {
         const allClues = node.requiresClues.every(clueId => 
           Object.keys($memory.unlockedClues).includes(clueId)
@@ -80,6 +94,20 @@ export const unlockedWorldviewNodes = derived(
       if (node.requiresPlaythroughAtLeast !== undefined) {
         if ($playthrough < node.requiresPlaythroughAtLeast) return false;
       }
+      return true;
+    }
+
+    function checkParentChain(node: WorldviewNode): boolean {
+      if (!node.parentNodeId) return true;
+      const parent = getNodeById(node.parentNodeId);
+      if (!parent) return true;
+      if (!checkConditions(parent)) return false;
+      return checkParentChain(parent);
+    }
+
+    return allWorldviewNodes.filter(node => {
+      if (!checkConditions(node)) return false;
+      if (!checkParentChain(node)) return false;
       return true;
     }).map(n => n.id);
   }
@@ -145,6 +173,16 @@ export function setSearchQuery(query: string): void {
 
 export function getNodeUnlockHints(node: WorldviewNode): string[] {
   const hints: string[] = [];
+
+  if (!isParentUnlocked(node)) {
+    const parent = node.parentNodeId ? getNodeById(node.parentNodeId) : undefined;
+    if (parent) {
+      hints.push(`需先解锁「${isNodeUnlocked(parent) && isParentUnlocked(parent) ? parent.title : '???'}」`);
+    } else {
+      hints.push('需先解锁上游节点');
+    }
+  }
+
   if (node.requiresClues && node.requiresClues.length > 0) {
     hints.push(`需要解锁 ${node.requiresClues.length} 条线索`);
   }

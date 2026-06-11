@@ -39,6 +39,10 @@
   }
 
   function handleSelectNode(node: WorldviewNode) {
+    if (!unlockedIds.includes(node.id)) {
+      playSFX('warning');
+      return;
+    }
     playSFX('switch');
     selectNode(node.id);
     if (node.category === 'chronology' && $worldviewState.activeTab !== 'chronology') {

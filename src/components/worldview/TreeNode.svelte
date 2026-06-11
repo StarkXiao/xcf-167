@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { WorldviewNode, WorldviewCategory } from '../../types/game';
   import { categoryLabels, categoryIcons } from '../../data/worldview';
+  import { getNodeUnlockHints } from '../../lib/worldview';
 
   export let node: WorldviewNode;
   export let level: number;
@@ -18,7 +19,7 @@
   $: children = getChildNodes(node.id);
   $: hasKids = children.length > 0;
   $: nodeColor = getNodeColor(node);
-  $: hints = getHints();
+  $: hints = getNodeUnlockHints(node).slice(0, 1);
   $: categoryIcon = getCategoryIcon(node.category);
   $: categoryLabel = getCategoryLabel(node.category);
 
@@ -28,21 +29,6 @@
 
   function getCategoryLabel(cat: string): string {
     return categoryLabels[cat as keyof typeof categoryLabels] || '未分类';
-  }
-
-  function getHints(): string[] {
-    if (unlocked) return [];
-    const hintsList: string[] = [];
-    if (node.requiresClues && node.requiresClues.length > 0) {
-      hintsList.push(`需${node.requiresClues.length}条线索`);
-    }
-    if (node.requiresEndings && node.requiresEndings.length > 0) {
-      hintsList.push(`需${node.requiresEndings.length}个结局`);
-    }
-    if (node.requiresPlaythroughAtLeast !== undefined) {
-      hintsList.push(`第${node.requiresPlaythroughAtLeast}周目+`);
-    }
-    return hintsList.slice(0, 1);
   }
 
   function handleClick() {
