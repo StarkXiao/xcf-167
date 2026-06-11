@@ -41,8 +41,21 @@
     getTrustLevelColor,
     CREW_MEMBERS,
     resetTrustState,
-    getTrustEndingModifiers
+    getTrustEndingModifiers,
+    getLockedEnding,
+    applyTrustEndingWeights
   } from '../../lib/trust';
+  import {
+    evidenceBoard,
+    predictedEnding,
+    collectEvidenceByNode,
+    resetEvidenceBoard,
+    getAllEndingWeights,
+    selectWeightedEnding,
+    addEndingWeightModifier,
+    getEndingWeight
+  } from '../../lib/evidence';
+  import { evidenceCards, baseEndingWeights } from '../../data/evidence';
 
   export let onClose: () => void;
 
@@ -80,6 +93,9 @@
   $: dialogueCount = currentNode?.dialogues?.length || 0;
   $: atDialogueEnd = dialogueIndex >= dialogueCount - 1;
   $: allEndings = $editorState.editedEndings ? Array.from($editorState.editedEndings.values()) : [];
+  $: evidenceState = $evidenceBoard;
+  $: predicted = $predictedEnding;
+  $: currentEvidenceWeights = getAllEndingWeights();
 
   $: availableChoices = (() => {
     if (!currentNode?.choices) return [];
@@ -109,6 +125,85 @@
 
   $: hasChoices = availableChoices.length > 0;
   $: trustInfo = $trustState;
+  $: collectedEvidenceCount = $evidenceBoard.collectedEvidence.length;
+
+  const choiceWeightMap: Record<string, Record<string, Record<string, number>>> = {
+    intro_2: {
+      c_fast: { ending_truth: -10, ending_loop: 10 },
+      c_normal: { ending_truth: 10, ending_survival: 5 }
+    },
+    first_contact: {
+      c_stay: { ending_survival: 10, ending_truth: 5 },
+      c_danmaku: { ending_truth: 15, ending_madness: 5 },
+      c_creature: { ending_truth: 20, ending_madness: 10, ending_silence: 5 }
+    },
+    critical_choice: {
+      c_keep_live: { ending_truth: 25, ending_madness: 15, ending_silence: 10 },
+      c_keep_live_2: { ending_truth: 20, ending_madness: 10 },
+      c_stop_live: { ending_survival: 25, ending_loop: 10 },
+      c_emergency: { ending_survival: 15, ending_silence: 20, ending_truth: 5 }
+    },
+    stop_continue: {
+      c_trust_su: { ending_survival: 30, ending_silence: -10 },
+      c_doubt: { ending_loop: 30, ending_truth: 10, ending_madness: 10 }
+    }
+  };
+
+  const endingRedirectMap: Record<string, { candidates: string[]; nodeMap: Record<string, string> }> = {
+    ending_resolve_live: {
+      candidates: ['ending_truth', 'ending_madness'],
+      nodeMap: {
+        ending_truth: 'ending_truth_node',
+        ending_madness: 'ending_madness_node'
+      }
+    },
+    ending_resolve_ascent: {
+      candidates: ['ending_survival', 'ending_silence', 'ending_truth'],
+      nodeMap: {
+        ending_survival: 'ending_survival_ascent',
+        ending_silence: 'ending_silence',
+        ending_truth: 'ending_truth_ascent'
+      }
+    },
+    ending_resolve_stop: {
+      candidates: ['ending_survival', 'ending_loop', 'ending_madness'],
+      nodeMap: {
+        ending_survival: 'ending_survival_stop',
+        ending_loop: 'ending_loop_stop',
+        ending_madness: 'ending_madness_stop'
+      }
+    }
+  };
+
+  function applyPreviewChoiceWeight(nodeId: string, choiceId: string): void {
+    const modifiers = choiceWeightMap[nodeId]?.[choiceId];
+    if (modifiers) {
+      Object.entries(modifiers).forEach(([endingId, value]) => {
+        addEndingWeightModifier(endingId, value, `choice:${nodeId}:${choiceId}`);
+      });
+    }
+  }
+
+  function resolvePreviewEndingRedirect(currentNodeId: string, nextNodeId: string): string {
+    const config = endingRedirectMap[currentNodeId];
+    if (!config) return nextNodeId;
+
+    applyTrustEndingWeights(addEndingWeightModifier);
+
+    const locked = getLockedEnding(config.candidates);
+    if (locked) {
+      console.log(`[预览结局裁定] 锁定结局: ${locked}`);
+      return config.nodeMap[locked] || nextNodeId;
+    }
+
+    const weightedEnding = selectWeightedEnding(config.candidates);
+    console.log(`[预览结局裁定] 加权随机结果: ${weightedEnding}, 候选: ${config.candidates.join(',')}`);
+    if (weightedEnding) {
+      return config.nodeMap[weightedEnding] || nextNodeId;
+    }
+
+    return nextNodeId;
+  }
 
   function checkPreviewCondition(condition?: StateCondition): boolean {
     if (!condition) return true;
@@ -219,8 +314,12 @@
     endingWeights = {};
     unlockedClues = {};
     visitedNodes = new Set();
+    endingJudgmentInfo = null;
     resetTrustState();
+    resetEvidenceBoard();
   }
+
+  let endingJudgmentInfo: { locked?: string; weights?: { endingId: string; weight: number; probability: number }[]; selected?: string; via?: string } | null = null;
 
   function stopAllTimers() {
     if (typingInterval) {
@@ -261,6 +360,8 @@
     if (node.trustEffect) {
       applyPreviewTrustEffect(node.trustEffect);
     }
+
+    collectEvidenceByNode(nodeId);
 
     if (node.isEnding && node.endingId) {
       const ending = allEndings.find(e => e.id === node.endingId);
@@ -391,7 +492,22 @@
       } else {
         const nextId = resolveNextNodeId();
         if (nextId) {
-          loadNode(nextId);
+          const redirected = resolvePreviewEndingRedirect(currentNodeId, nextId);
+          if (redirected !== nextId) {
+            const preResolveWeights = getAllEndingWeights();
+            const eConfig = endingRedirectMap[currentNodeId];
+            endingJudgmentInfo = {
+              weights: preResolveWeights.filter(w => eConfig?.candidates.includes(w.endingId)),
+              selected: Object.entries(eConfig?.nodeMap || {}).find(([, v]) => v === redirected)?.[0] || redirected,
+              via: endingRedirectMap[currentNodeId] ? (Object.entries(endingRedirectMap[currentNodeId].nodeMap).find(([, v]) => v === redirected)?.[0] === getLockedEnding(endingRedirectMap[currentNodeId].candidates) ? 'locked' : 'weighted') : 'direct'
+            };
+            const lockTest = getLockedEnding(endingRedirectMap[currentNodeId]?.candidates || []);
+            if (lockTest) {
+              endingJudgmentInfo.locked = lockTest;
+              endingJudgmentInfo.via = 'locked';
+            }
+          }
+          loadNode(redirected);
         } else if (currentNode?.isEnding) {
           const endingId = currentNode.endingId;
           if (endingId) {
@@ -423,6 +539,11 @@
     playSFX('select');
     showChoices = false;
 
+    const choiceId = choice.id || `idx_${currentNode?.choices?.indexOf(choice) ?? 0}`;
+    if (currentNodeId) {
+      applyPreviewChoiceWeight(currentNodeId, choiceId);
+    }
+
     if (choice.effect) {
       applyPreviewEffect(choice.effect);
     }
@@ -434,7 +555,22 @@
     applyPreviewMemoryEffect(choice);
 
     if (choice.nextNodeId) {
-      loadNode(choice.nextNodeId);
+      const redirected = resolvePreviewEndingRedirect(currentNodeId, choice.nextNodeId);
+      if (redirected !== choice.nextNodeId) {
+        const preResolveWeights = getAllEndingWeights();
+        const eConfig = endingRedirectMap[currentNodeId];
+        endingJudgmentInfo = {
+          weights: preResolveWeights.filter(w => eConfig?.candidates.includes(w.endingId)),
+          selected: Object.entries(eConfig?.nodeMap || {}).find(([, v]) => v === redirected)?.[0] || redirected,
+          via: 'weighted'
+        };
+        const lockTest = getLockedEnding(endingRedirectMap[currentNodeId]?.candidates || []);
+        if (lockTest) {
+          endingJudgmentInfo.locked = lockTest;
+          endingJudgmentInfo.via = 'locked';
+        }
+      }
+      loadNode(redirected);
     } else {
       alert('此选项没有设置跳转节点');
     }
@@ -546,18 +682,55 @@
               <div class="ending-type">{currentEnding.isGood ? '— 好结局 —' : '— 坏结局 —'}</div>
               <h3 class="ending-title">{currentEnding.title}</h3>
               <p class="ending-desc">{currentEnding.description}</p>
+
+              {#if endingJudgmentInfo}
+                <div class="ending-judgment-detail">
+                  <div class="ejd-title">
+                    裁定方式：
+                    {#if endingJudgmentInfo.via === 'locked'}
+                      <span class="ejd-way ejd-locked">🔒 锁定结局（信任极值）</span>
+                    {:else if endingJudgmentInfo.via === 'weighted'}
+                      <span class="ejd-way ejd-weighted">🎲 加权随机裁定</span>
+                    {:else}
+                      <span class="ejd-way">{endingJudgmentInfo.via || '直接'}</span>
+                    {/if}
+                  </div>
+                  {#if endingJudgmentInfo.locked}
+                    <div class="ejd-locked">触发条件：{endingJudgmentInfo.locked} 被锁定（信任达到 extreme）</div>
+                  {/if}
+                  {#if endingJudgmentInfo.weights && endingJudgmentInfo.weights.length > 0}
+                    <div class="ejd-candidates-title">候选权重与概率：</div>
+                    <div class="ejd-candidates">
+                      {#each endingJudgmentInfo.weights as w}
+                        <div class="ejd-candidate" class:ejd-selected={w.endingId === endingJudgmentInfo.selected}>
+                          <span class="ejd-cand-id">{w.endingId}</span>
+                          <div class="ejd-cand-bar-wrap">
+                            <div class="ejd-cand-bar" style="width: {Math.min(w.probability * 100, 100)}%"></div>
+                          </div>
+                          <span class="ejd-cand-weight">权重:{w.weight}</span>
+                          <span class="ejd-cand-prob">{(w.probability * 100).toFixed(1)}%</span>
+                          {#if w.endingId === endingJudgmentInfo.selected}
+                            <span class="ejd-cand-mark">← 本次选中</span>
+                          {/if}
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+
               <div class="ending-weights-preview">
-                <div class="ew-title">结局权重快照</div>
-                {#each Object.entries(endingWeights).sort((a, b) => b[1] - a[1]) as [eid, weight]}
+                <div class="ew-title">全结局权重快照</div>
+                {#each getAllEndingWeights() as ewi}
                   <div class="ew-row">
-                    <span class="ew-id">{eid}</span>
-                    <span class="ew-val">{weight > 0 ? '+' : ''}{weight}</span>
+                    <span class="ew-id">{ewi.endingId}</span>
+                    <span class="ew-val">基础: {baseEndingWeights[ewi.endingId] ?? 0}</span>
+                    <span class="ew-val">权重: {ewi.weight}</span>
+                    <span class="ew-val">概率: {(ewi.probability * 100).toFixed(1)}%</span>
                   </div>
                 {/each}
-                {#if Object.keys(endingWeights).length === 0}
-                  <div class="ew-empty">暂无权重累积</div>
-                {/if}
               </div>
+
               <div class="ending-actions">
                 <button class="ending-btn" on:click|stopPropagation={handleRestart}>
                   ↺ 重新预览
@@ -681,25 +854,70 @@
       </div>
 
       <div class="sidebar-section">
-        <h4 class="sidebar-title">⚖️ 结局权重</h4>
-        <div class="weight-list">
-          {#each Object.entries(endingWeights).sort((a, b) => b[1] - a[1]) as [eid, weight]}
-            <div class="weight-row">
-              <span class="weight-id">{eid}</span>
-              <div class="weight-bar-wrap">
-                <div
-                  class="weight-bar"
-                  class:positive={weight > 0}
-                  class:negative={weight < 0}
-                  style="width: {Math.min(Math.abs(weight), 100)}%"
-                ></div>
-              </div>
-              <span class="weight-val">{weight > 0 ? '+' : ''}{weight}</span>
+        <h4 class="sidebar-title">📑 证据收集 ({collectedEvidenceCount}/{evidenceCards.length})</h4>
+        <div class="evidence-list">
+          {#each $evidenceBoard.collectedEvidence as ev}
+            <div class="evidence-item evidence-{ev.status}" title={ev.title}>
+              <span class="ev-importance">{'★'.repeat(ev.importance || 0)}</span>
+              <span class="ev-title">{ev.title}</span>
             </div>
           {/each}
-          {#if Object.keys(endingWeights).length === 0}
-            <div class="var-empty">暂无权重</div>
+          {#if collectedEvidenceCount === 0}
+            <div class="var-empty">暂未收集证据</div>
           {/if}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">
+          🎯 预测结局
+          {#if predicted?.topEnding}
+            <span class="prediction-top">= {predicted.topEnding.endingId}</span>
+          {/if}
+        </h4>
+        <div class="prediction-list">
+          {#each predicted?.allWeights || currentEvidenceWeights as pw}
+            <div class="prediction-row">
+              <span class="pred-id">{pw.endingId}</span>
+              <div class="pred-bar-wrap">
+                <div
+                  class="pred-bar"
+                  style="width: {Math.min(pw.probability * 100, 100)}%"
+                ></div>
+              </div>
+              <span class="pred-weight">{pw.weight}</span>
+              <span class="pred-prob">{(pw.probability * 100).toFixed(1)}%</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="sidebar-title">⚖️ 权重详情</h4>
+        <div class="weight-detail-list">
+          {#each $evidenceBoard.endingWeights as ew}
+            <details class="weight-details" open={ew.modifiers.length > 0}>
+              <summary>
+                <span class="wd-id">{ew.endingId}</span>
+                <span class="wd-base">基础:{ew.baseWeight}</span>
+                <span class="wd-current">当前:{ew.weight}</span>
+                <span class="wd-count">{ew.modifiers.length}项修正</span>
+              </summary>
+              <div class="wd-modifiers">
+                {#each ew.modifiers as m}
+                  <div class="wd-mod">
+                    <span class="wd-mod-src">{m.source}</span>
+                    <span class:wd-mod-val-positive={m.value > 0} class:wd-mod-val-negative={m.value < 0} class="wd-mod-val">
+                      {m.value > 0 ? '+' : ''}{m.value}
+                    </span>
+                  </div>
+                {/each}
+                {#if ew.modifiers.length === 0}
+                  <div class="wd-mod-empty">无修正项</div>
+                {/if}
+              </div>
+            </details>
+          {/each}
         </div>
       </div>
 
@@ -1555,5 +1773,320 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  .evidence-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  .evidence-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    padding: 3px 6px;
+    background: rgba(0, 160, 100, 0.06);
+    border-radius: 3px;
+    border-left: 2px solid rgba(0, 200, 120, 0.3);
+  }
+
+  .evidence-item.evidence-used {
+    background: rgba(100, 100, 100, 0.06);
+    border-left-color: rgba(150, 150, 150, 0.3);
+    opacity: 0.7;
+  }
+
+  .evidence-item.evidence-placed {
+    background: rgba(0, 120, 200, 0.08);
+    border-left-color: rgba(80, 180, 255, 0.4);
+  }
+
+  .ev-importance {
+    color: #ffc040;
+    font-size: 0.65rem;
+    letter-spacing: -0.5px;
+  }
+
+  .ev-title {
+    color: #a0d0c0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .prediction-top {
+    font-size: 0.78rem;
+    color: #ffc040;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  .prediction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .prediction-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+  }
+
+  .pred-id {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+    min-width: 90px;
+    font-size: 0.72rem;
+  }
+
+  .pred-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .pred-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00c8e0, #ffc040);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .pred-weight {
+    font-family: 'Courier New', monospace;
+    color: #8aa0b8;
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.7rem;
+  }
+
+  .pred-prob {
+    font-family: 'Courier New', monospace;
+    color: #ffc040;
+    font-weight: 600;
+    min-width: 42px;
+    text-align: right;
+    font-size: 0.7rem;
+  }
+
+  .weight-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .weight-details {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+    padding: 2px 6px;
+  }
+
+  .weight-details summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    padding: 3px 0;
+    user-select: none;
+  }
+
+  .weight-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .weight-details summary::before {
+    content: '▶';
+    font-size: 0.6rem;
+    color: #5a8aaa;
+    transition: transform 0.15s;
+  }
+
+  .weight-details[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .wd-id {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    min-width: 80px;
+  }
+
+  .wd-base {
+    color: #5a8aaa;
+    font-size: 0.7rem;
+  }
+
+  .wd-current {
+    color: #ffc040;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+  }
+
+  .wd-count {
+    color: #6a8aaa;
+    font-size: 0.68rem;
+    margin-left: auto;
+  }
+
+  .wd-modifiers {
+    padding: 5px 0 6px 16px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+  }
+
+  .wd-mod {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    padding: 2px 0;
+  }
+
+  .wd-mod-src {
+    color: #7090a8;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+  }
+
+  .wd-mod-val {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+
+  .wd-mod-val-positive {
+    color: #4ade80;
+  }
+
+  .wd-mod-val-negative {
+    color: #f87171;
+  }
+
+  .wd-mod-empty {
+    font-size: 0.7rem;
+    color: #4a6a7a;
+  }
+
+  .ending-judgment-detail {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: left;
+  }
+
+  .ejd-title {
+    font-size: 0.85rem;
+    color: #c0d0e0;
+    margin-bottom: 6px;
+  }
+
+  .ejd-way {
+    font-weight: 600;
+    margin-left: 4px;
+  }
+
+  .ejd-way.ejd-locked {
+    color: #f87171;
+  }
+
+  .ejd-way.ejd-weighted {
+    color: #60c0e0;
+  }
+
+  .ejd-locked {
+    font-size: 0.78rem;
+    color: #ff8080;
+    padding: 4px 8px;
+    background: rgba(255, 100, 100, 0.1);
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+
+  .ejd-candidates-title {
+    font-size: 0.78rem;
+    color: #8aa0b8;
+    margin: 6px 0;
+  }
+
+  .ejd-candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ejd-candidate {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    padding: 5px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .ejd-candidate.ejd-selected {
+    background: rgba(0, 255, 200, 0.1);
+    border: 1px solid rgba(0, 255, 200, 0.35);
+  }
+
+  .ejd-cand-id {
+    color: #a0c0e0;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    min-width: 90px;
+  }
+
+  .ejd-cand-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .ejd-cand-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00c8e0, #ffc040);
+    border-radius: 2px;
+  }
+
+  .ejd-selected .ejd-cand-bar {
+    background: linear-gradient(90deg, #00ffc8, #ff8040);
+  }
+
+  .ejd-cand-weight {
+    font-family: 'Courier New', monospace;
+    color: #8aa0b8;
+    font-size: 0.72rem;
+    min-width: 55px;
+    text-align: right;
+  }
+
+  .ejd-cand-prob {
+    font-family: 'Courier New', monospace;
+    color: #ffc040;
+    font-weight: 600;
+    font-size: 0.72rem;
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .ejd-cand-mark {
+    color: #00ffc8;
+    font-size: 0.72rem;
+    font-weight: 600;
   }
 </style>
