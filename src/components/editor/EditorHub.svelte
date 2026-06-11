@@ -19,6 +19,7 @@
   import SfxEditor from './SfxEditor.svelte';
   import EndingEditor from './EndingEditor.svelte';
   import PreviewPlayer from './PreviewPlayer.svelte';
+  import ClipEditor from './ClipEditor.svelte';
   import { playSFX } from '../../lib/audio';
 
   export let onBackToMenu: () => void;
@@ -46,6 +47,7 @@
     { id: 'danmaku', label: '弹幕时间轴', icon: '💬' },
     { id: 'sfx', label: '音效触发', icon: '🔊' },
     { id: 'endings', label: '结局条件', icon: '🎬' },
+    { id: 'clip', label: '回放剪辑台', icon: '✂️' },
     { id: 'preview', label: '预览试玩', icon: '▶' }
   ];
 
@@ -202,7 +204,7 @@
   </nav>
 
   <div class="editor-body">
-    {#if currentTab !== 'preview'}
+    {#if currentTab !== 'preview' && currentTab !== 'clip'}
       <aside class="sidebar">
         <div class="sidebar-header">
           <h3>节点列表</h3>
@@ -265,6 +267,8 @@
         <SfxEditor />
       {:else if currentTab === 'endings'}
         <EndingEditor />
+      {:else if currentTab === 'clip'}
+        <ClipEditor />
       {:else if currentTab === 'preview'}
         <PreviewPlayer onClose={handleClosePreview} />
       {/if}

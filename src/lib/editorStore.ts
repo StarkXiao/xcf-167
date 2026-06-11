@@ -20,7 +20,7 @@ import type {
 import { nodes as originalNodes, endings as originalEndings } from '../data/story';
 import { crewNodes as crewOriginalNodes, crewEndings as crewOriginalEndings } from '../data/crewStory';
 
-export type EditorTab = 'nodes' | 'danmaku' | 'sfx' | 'endings' | 'preview';
+export type EditorTab = 'nodes' | 'danmaku' | 'sfx' | 'endings' | 'preview' | 'clip';
 
 export interface EditorState {
   activeTab: EditorTab;
