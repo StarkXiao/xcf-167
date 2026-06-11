@@ -158,9 +158,25 @@ export function moveDanmaku(segmentId: string, danmakuId: string, newIndex: numb
     if (!version) return s;
     
     const segKey = segmentId;
-    const currentOrder = version.danmakuOrder[segKey] || [];
-    const oldIndex = currentOrder.indexOf(danmakuId);
-    if (oldIndex === -1) return s;
+    let currentOrder = version.danmakuOrder[segKey] || [];
+    let oldIndex = currentOrder.indexOf(danmakuId);
+    
+    if (oldIndex === -1) {
+      const segment = s.segments.find(seg => seg.id === segmentId);
+      if (!segment) return s;
+      
+      const node = get(allNodes).find(n => n.id === segment.nodeId);
+      if (!node?.danmakus) return s;
+      
+      const segmentDanmakus = node.danmakus.filter(d => {
+        const dIdx = d.dialogueIndex ?? 0;
+        return dIdx >= segment.startDialogueIndex && dIdx <= segment.endDialogueIndex;
+      });
+      
+      currentOrder = segmentDanmakus.map(d => d.id);
+      oldIndex = currentOrder.indexOf(danmakuId);
+      if (oldIndex === -1) return s;
+    }
     
     const newOrder = [...currentOrder];
     newOrder.splice(oldIndex, 1);
