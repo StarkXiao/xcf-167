@@ -17,6 +17,7 @@
   export let onShowWorldview: () => void;
   export let onOpenEditor: () => void;
   export let onShowCaseLinkage: () => void;
+  export let onShowWorkshop: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -93,6 +94,11 @@
   function handleCaseLinkage() {
     playSFX('select');
     onShowCaseLinkage();
+  }
+
+  function handleWorkshop() {
+    playSFX('select');
+    onShowWorkshop();
   }
 
   function backToMenu() {
@@ -203,6 +209,14 @@
           <span class="btn-icon">🔗</span>
           <span class="btn-text">
             多案件联动篇
+            <span class="menu-badge new">NEW</span>
+          </span>
+        </button>
+
+        <button class="menu-btn workshop-btn" on:click={handleWorkshop}>
+          <span class="btn-icon">🛠</span>
+          <span class="btn-text">
+            玩家创作工坊
             <span class="menu-badge new">NEW</span>
           </span>
         </button>
@@ -607,6 +621,16 @@
   .menu-btn.case-linkage-btn:hover, .menu-btn.case-linkage-btn:active {
     background: linear-gradient(135deg, rgba(179, 102, 255, 0.3), rgba(77, 166, 255, 0.2));
     border-color: rgba(179, 102, 255, 0.6);
+  }
+
+  .menu-btn.workshop-btn {
+    background: linear-gradient(135deg, rgba(255, 180, 60, 0.15), rgba(255, 120, 40, 0.1));
+    border-color: rgba(255, 180, 60, 0.3);
+  }
+
+  .menu-btn.workshop-btn:hover, .menu-btn.workshop-btn:active {
+    background: linear-gradient(135deg, rgba(255, 180, 60, 0.3), rgba(255, 120, 40, 0.2));
+    border-color: rgba(255, 180, 60, 0.6);
   }
 
   .menu-badge.new {

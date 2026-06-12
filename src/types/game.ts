@@ -1071,4 +1071,92 @@ export interface WorldviewTreeState {
 
 export type WorldviewTab = WorldviewCategory | 'tree';
 
+// ============ 玩家创作工坊类型定义 ============
+
+export type WorkshopTab = 'nodes' | 'branches' | 'danmaku' | 'sfx' | 'validate' | 'trial' | 'share';
+
+export type WorkshopNodeTemplateType = 'dialogue' | 'choice' | 'branch' | 'ending' | 'checkpoint';
+
+export interface WorkshopNodeTemplate {
+  id: string;
+  type: WorkshopNodeTemplateType;
+  label: string;
+  description: string;
+  defaultData: Partial<StoryNode>;
+}
+
+export interface WorkshopDanmakuTemplate {
+  id: string;
+  name: string;
+  description: string;
+  danmakus: Omit<Danmaku, 'id'>[];
+}
+
+export interface WorkshopSfxTemplate {
+  id: string;
+  name: string;
+  description: string;
+  triggers: AudioTrigger[];
+}
+
+export type ValidationSeverity = 'error' | 'warning' | 'info';
+
+export interface ValidationIssue {
+  severity: ValidationSeverity;
+  nodeId?: string;
+  field?: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  issues: ValidationIssue[];
+  stats: {
+    nodeCount: number;
+    dialogueCount: number;
+    danmakuCount: number;
+    choiceCount: number;
+    endingCount: number;
+    orphanNodes: string[];
+    unreachableNodes: string[];
+  };
+}
+
+export interface WorkshopCreation {
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  nodes: StoryNode[];
+  endings: Ending[];
+  danmakuTemplates: WorkshopDanmakuTemplate[];
+  sfxTemplates: WorkshopSfxTemplate[];
+  thumbnail?: string;
+}
+
+export interface WorkshopSharePayload {
+  format: 'deep-sea-workshop-v1';
+  creation: WorkshopCreation;
+  exportedAt: number;
+  checksum: string;
+}
+
+export interface WorkshopState {
+  isOpen: boolean;
+  activeTab: WorkshopTab;
+  currentCreation: WorkshopCreation | null;
+  savedCreations: WorkshopCreation[];
+  validationResult: ValidationResult | null;
+  isValidating: boolean;
+  isTrialing: boolean;
+  isSharing: boolean;
+  shareCode: string | null;
+  selectedNodeId: string | null;
+  selectedDanmakuTemplateId: string | null;
+  selectedSfxTemplateId: string | null;
+}
+
 

@@ -9,6 +9,7 @@
   import ChapterEndOverlay from './components/ChapterEndOverlay.svelte';
   import ArchiveHub from './components/ArchiveHub.svelte';
   import WorldviewEncyclopedia from './components/WorldviewEncyclopedia.svelte';
+  import WorkshopHub from './components/WorkshopHub.svelte';
   import EditorHub from './components/editor/EditorHub.svelte';
   import CaseSelection from './components/CaseSelection.svelte';
   import ClueBoard from './components/ClueBoard.svelte';
@@ -46,6 +47,7 @@
   let showChapterEnd = false;
   let showArchive = false;
   let showWorldview = false;
+  let showWorkshop = false;
   let chapterEndNodeId = '';
 
   function handleNewGame() {
@@ -92,6 +94,14 @@
 
   function handleShowWorldview() {
     showWorldview = true;
+  }
+
+  function handleShowWorkshop() {
+    showWorkshop = true;
+  }
+
+  function handleCloseWorkshop() {
+    showWorkshop = false;
   }
 
   function handleOpenEditor() {
@@ -263,6 +273,7 @@
       onShowChapterReview={handleShowChapterReview}
       onShowArchive={handleShowArchive}
       onShowWorldview={handleShowWorldview}
+      onShowWorkshop={handleShowWorkshop}
       onOpenEditor={handleOpenEditor}
       onShowCaseLinkage={handleShowCaseLinkage}
     />
@@ -295,6 +306,7 @@
   />
   <ArchiveHub isOpen={showArchive} onClose={handleCloseArchive} />
   <WorldviewEncyclopedia isOpen={showWorldview} onClose={handleCloseWorldview} />
+  <WorkshopHub isOpen={showWorkshop} onClose={handleCloseWorkshop} />
   <CaseSelection onStartCase={handleStartCase} onOpenClueBoard={handleOpenClueBoard} />
   <ClueBoard />
 </div>
