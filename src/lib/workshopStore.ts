@@ -16,6 +16,7 @@ import type {
   DialogueLine,
   Choice,
   AudioTrigger,
+  NextNodeBranch,
   SFXType,
   MoodType,
   BGMType
@@ -499,6 +500,52 @@ export function deleteChoice(nodeId: string, choiceIndex: number): void {
   });
 }
 
+export function addBranchToNode(nodeId: string): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const nodes = s.currentCreation.nodes.map(n => {
+      if (n.id !== nodeId) return n;
+      const branches = [...(n.nextNodeBranches || []), { nextNodeId: '', priority: (n.nextNodeBranches?.length || 0) + 1 } as NextNodeBranch];
+      return { ...n, nextNodeBranches: branches };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, nodes, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function updateBranchInNode(nodeId: string, branchIndex: number, updates: Partial<NextNodeBranch>): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const nodes = s.currentCreation.nodes.map(n => {
+      if (n.id !== nodeId || !n.nextNodeBranches?.[branchIndex]) return n;
+      const branches = [...n.nextNodeBranches];
+      branches[branchIndex] = { ...branches[branchIndex], ...updates };
+      return { ...n, nextNodeBranches: branches };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, nodes, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function deleteBranchFromNode(nodeId: string, branchIndex: number): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const nodes = s.currentCreation.nodes.map(n => {
+      if (n.id !== nodeId || !n.nextNodeBranches) return n;
+      const branches = n.nextNodeBranches.filter((_, i) => i !== branchIndex);
+      return { ...n, nextNodeBranches: branches.length > 0 ? branches : undefined };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, nodes, updatedAt: Date.now() }
+    };
+  });
+}
+
 export function addDanmakuToNode(nodeId: string, dialogueIndex: number): void {
   workshopState.update(s => {
     if (!s.currentCreation) return s;
@@ -741,6 +788,204 @@ export function addCustomSfxTemplate(name: string, description: string): void {
       }
     };
   });
+}
+
+export function updateCustomDanmakuTemplate(templateId: string, updates: Partial<WorkshopDanmakuTemplate>): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const danmakuTemplates = s.currentCreation.danmakuTemplates.map(t =>
+      t.id === templateId ? { ...t, ...updates } : t
+    );
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, danmakuTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function deleteCustomDanmakuTemplate(templateId: string): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    return {
+      ...s,
+      currentCreation: {
+        ...s.currentCreation,
+        danmakuTemplates: s.currentCreation.danmakuTemplates.filter(t => t.id !== templateId),
+        updatedAt: Date.now()
+      },
+      selectedDanmakuTemplateId: s.selectedDanmakuTemplateId === templateId ? null : s.selectedDanmakuTemplateId
+    };
+  });
+}
+
+export function addDanmakuToTemplate(templateId: string): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const danmakuTemplates = s.currentCreation.danmakuTemplates.map(t => {
+      if (t.id !== templateId) return t;
+      return { ...t, danmakus: [...t.danmakus, { username: '观众', content: '新弹幕', timestamp: 0, dialogueIndex: 0, relativeMs: Math.random() * 3000, color: '#66ccff' }] };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, danmakuTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function updateDanmakuInTemplate(templateId: string, danmakuIndex: number, updates: Partial<Omit<Danmaku, 'id'>>): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const danmakuTemplates = s.currentCreation.danmakuTemplates.map(t => {
+      if (t.id !== templateId || !t.danmakus[danmakuIndex]) return t;
+      const danmakus = [...t.danmakus];
+      danmakus[danmakuIndex] = { ...danmakus[danmakuIndex], ...updates };
+      return { ...t, danmakus };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, danmakuTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function deleteDanmakuFromTemplate(templateId: string, danmakuIndex: number): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const danmakuTemplates = s.currentCreation.danmakuTemplates.map(t => {
+      if (t.id !== templateId) return t;
+      return { ...t, danmakus: t.danmakus.filter((_, i) => i !== danmakuIndex) };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, danmakuTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function applyCustomDanmakuTemplate(nodeId: string, templateId: string): void {
+  const state = get(workshopState);
+  if (!state.currentCreation) return;
+  const template = state.currentCreation.danmakuTemplates.find(t => t.id === templateId);
+  if (!template) return;
+
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const nodes = s.currentCreation.nodes.map(n => {
+      if (n.id !== nodeId) return n;
+      const newDanmakus: Danmaku[] = template.danmakus.map((d, i) => ({
+        ...d,
+        id: `dm_ws_${Date.now()}_${i}`
+      }));
+      return { ...n, danmakus: [...(n.danmakus || []), ...newDanmakus] };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, nodes, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function updateCustomSfxTemplate(templateId: string, updates: Partial<WorkshopSfxTemplate>): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const sfxTemplates = s.currentCreation.sfxTemplates.map(t =>
+      t.id === templateId ? { ...t, ...updates } : t
+    );
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, sfxTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function deleteCustomSfxTemplate(templateId: string): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    return {
+      ...s,
+      currentCreation: {
+        ...s.currentCreation,
+        sfxTemplates: s.currentCreation.sfxTemplates.filter(t => t.id !== templateId),
+        updatedAt: Date.now()
+      },
+      selectedSfxTemplateId: s.selectedSfxTemplateId === templateId ? null : s.selectedSfxTemplateId
+    };
+  });
+}
+
+export function addTriggerToSfxTemplate(templateId: string): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const sfxTemplates = s.currentCreation.sfxTemplates.map(t => {
+      if (t.id !== templateId) return t;
+      return { ...t, triggers: [...t.triggers, { sfx: 'click' as SFXType, delay: 0, volume: 0.8 }] };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, sfxTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function updateTriggerInSfxTemplate(templateId: string, triggerIndex: number, updates: Partial<AudioTrigger>): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const sfxTemplates = s.currentCreation.sfxTemplates.map(t => {
+      if (t.id !== templateId || !t.triggers[triggerIndex]) return t;
+      const triggers = [...t.triggers];
+      triggers[triggerIndex] = { ...triggers[triggerIndex], ...updates };
+      return { ...t, triggers };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, sfxTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function deleteTriggerFromSfxTemplate(templateId: string, triggerIndex: number): void {
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const sfxTemplates = s.currentCreation.sfxTemplates.map(t => {
+      if (t.id !== templateId) return t;
+      return { ...t, triggers: t.triggers.filter((_, i) => i !== triggerIndex) };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, sfxTemplates, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function applyCustomSfxTemplate(nodeId: string, dialogueIndex: number, templateId: string): void {
+  const state = get(workshopState);
+  if (!state.currentCreation) return;
+  const template = state.currentCreation.sfxTemplates.find(t => t.id === templateId);
+  if (!template) return;
+
+  workshopState.update(s => {
+    if (!s.currentCreation) return s;
+    const nodes = s.currentCreation.nodes.map(n => {
+      if (n.id !== nodeId || !n.dialogues[dialogueIndex]) return n;
+      const dialogues = [...n.dialogues];
+      const d = { ...dialogues[dialogueIndex] };
+      d.sfx = [...(d.sfx || []), ...template.triggers.map(t => ({ ...t }))];
+      dialogues[dialogueIndex] = d;
+      return { ...n, dialogues };
+    });
+    return {
+      ...s,
+      currentCreation: { ...s.currentCreation, nodes, updatedAt: Date.now() }
+    };
+  });
+}
+
+export function selectDanmakuTemplate(templateId: string | null): void {
+  workshopState.update(s => ({ ...s, selectedDanmakuTemplateId: templateId }));
+}
+
+export function selectSfxTemplate(templateId: string | null): void {
+  workshopState.update(s => ({ ...s, selectedSfxTemplateId: templateId }));
 }
 
 export function validateCreation(): ValidationResult {

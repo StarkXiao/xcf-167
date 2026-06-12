@@ -27,6 +27,9 @@
     addChoiceToNode,
     updateChoice,
     deleteChoice,
+    addBranchToNode,
+    updateBranchInNode,
+    deleteBranchFromNode,
     addDanmakuToNode,
     applyDanmakuTemplate,
     updateDanmakuInNode,
@@ -39,7 +42,21 @@
     updateEnding,
     deleteEnding,
     addCustomDanmakuTemplate,
+    updateCustomDanmakuTemplate,
+    deleteCustomDanmakuTemplate,
+    addDanmakuToTemplate,
+    updateDanmakuInTemplate,
+    deleteDanmakuFromTemplate,
+    applyCustomDanmakuTemplate,
     addCustomSfxTemplate,
+    updateCustomSfxTemplate,
+    deleteCustomSfxTemplate,
+    addTriggerToSfxTemplate,
+    updateTriggerInSfxTemplate,
+    deleteTriggerFromSfxTemplate,
+    applyCustomSfxTemplate,
+    selectDanmakuTemplate,
+    selectSfxTemplate,
     validateCreation,
     generateShareCode,
     importFromShareCode,
@@ -87,6 +104,35 @@
 
   function asSFX(val: string): SFXType | undefined {
     return SFX_OPTIONS.includes(val as SFXType) ? (val as SFXType) : undefined;
+  }
+
+  function parseConditionValue(valStr: string): string | number | boolean {
+    if (valStr === 'true') return true;
+    if (valStr === 'false') return false;
+    if (!isNaN(Number(valStr)) && valStr.trim() !== '') return Number(valStr);
+    return valStr;
+  }
+
+  function updateBranchCondition(nodeId: string, bi: number, currentCondition: Record<string, string | number | boolean> | undefined, newKey: string, newVal: string | number | boolean) {
+    if (newKey) {
+      updateBranchInNode(nodeId, bi, { condition: { [newKey]: newVal } });
+    } else {
+      updateBranchInNode(nodeId, bi, { condition: undefined });
+    }
+  }
+
+  function updateBranchConditionKey(nodeId: string, bi: number, currentCondition: Record<string, string | number | boolean> | undefined, newKey: string) {
+    const existing = currentCondition || {};
+    const oldKey = Object.keys(existing)[0];
+    const val = oldKey ? existing[oldKey] : '';
+    updateBranchCondition(nodeId, bi, currentCondition, newKey.trim(), val);
+  }
+
+  function updateBranchConditionValue(nodeId: string, bi: number, currentCondition: Record<string, string | number | boolean> | undefined, valStr: string) {
+    const key = currentCondition ? Object.keys(currentCondition)[0] : '';
+    if (!key) return;
+    const parsed = parseConditionValue(valStr);
+    updateBranchCondition(nodeId, bi, currentCondition, key, parsed);
   }
 
   function handleClose() {
@@ -145,6 +191,14 @@
 
   function handleDeleteChoice(nodeId: string, idx: number) {
     deleteChoice(nodeId, idx);
+  }
+
+  function handleAddBranch(nodeId: string) {
+    addBranchToNode(nodeId);
+  }
+
+  function handleDeleteBranch(nodeId: string, idx: number) {
+    deleteBranchFromNode(nodeId, idx);
   }
 
   function handleAddDanmaku(nodeId: string, dialogueIdx: number) {
@@ -243,12 +297,48 @@
     playSFX('select');
   }
 
+  function handleDeleteCustomDanmakuTpl(tplId: string) {
+    playSFX('warning');
+    deleteCustomDanmakuTemplate(tplId);
+  }
+
+  function handleAddDanmakuToTpl(tplId: string) {
+    addDanmakuToTemplate(tplId);
+  }
+
+  function handleDeleteDanmakuFromTpl(tplId: string, idx: number) {
+    deleteDanmakuFromTemplate(tplId, idx);
+  }
+
+  function handleApplyCustomDanmakuTpl(nodeId: string, tplId: string) {
+    playSFX('select');
+    applyCustomDanmakuTemplate(nodeId, tplId);
+  }
+
   function handleAddCustomSfxTpl() {
     if (!newSfxTplName.trim()) return;
     addCustomSfxTemplate(newSfxTplName.trim(), newSfxTplDesc.trim());
     newSfxTplName = '';
     newSfxTplDesc = '';
     playSFX('select');
+  }
+
+  function handleDeleteCustomSfxTpl(tplId: string) {
+    playSFX('warning');
+    deleteCustomSfxTemplate(tplId);
+  }
+
+  function handleAddTriggerToSfxTpl(tplId: string) {
+    addTriggerToSfxTemplate(tplId);
+  }
+
+  function handleDeleteTriggerFromSfxTpl(tplId: string, idx: number) {
+    deleteTriggerFromSfxTemplate(tplId, idx);
+  }
+
+  function handleApplyCustomSfxTpl(nodeId: string, dialogueIdx: number, tplId: string) {
+    playSFX('select');
+    applyCustomSfxTemplate(nodeId, dialogueIdx, tplId);
   }
 
   function startTrialPlay() {
@@ -638,6 +728,11 @@
                             🎵 {sfxTpl.name}
                           </button>
                         {/each}
+                        {#each $currentSfxTemplates as customSfxTpl}
+                          <button class="xs-btn tpl custom-tpl-btn" on:click={() => handleApplyCustomSfxTpl(node.id, i, customSfxTpl.id)}>
+                            🎶 {customSfxTpl.name}
+                          </button>
+                        {/each}
                       </div>
                     </div>
                   {/each}
@@ -674,6 +769,52 @@
                     {/each}
                   </div>
                 {/if}
+
+                <div class="edit-section">
+                  <div class="section-header">
+                    <h4>条件分支 ({node.nextNodeBranches?.length || 0})</h4>
+                    <button class="sm-btn" on:click={() => handleAddBranch(node.id)}>+ 添加分支</button>
+                  </div>
+                  {#if node.nextNodeBranches && node.nextNodeBranches.length > 0}
+                    {#each node.nextNodeBranches as branch, bi}
+                      <div class="branch-card">
+                        <div class="branch-card-header">
+                          <span>分支 #{bi + 1}</span>
+                          <button class="del-sm-btn" on:click={() => handleDeleteBranch(node.id, bi)}>✕</button>
+                        </div>
+                        <div class="edit-row">
+                          <label>目标节点</label>
+                          <select class="edit-select" value={branch.nextNodeId || ''}
+                            on:change={(e) => updateBranchInNode(node.id, bi, { nextNodeId: e.currentTarget.value })}>
+                            <option value="">— 选择目标节点 —</option>
+                            {#each allNodeIds as nid}
+                              <option value={nid}>{nid}</option>
+                            {/each}
+                          </select>
+                        </div>
+                        <div class="edit-row">
+                          <label>优先级</label>
+                          <input type="number" class="edit-input sm" value={branch.priority || 0} min="0"
+                            on:input={(e) => updateBranchInNode(node.id, bi, { priority: parseInt(e.currentTarget.value) || 0 })} />
+                        </div>
+                        <div class="edit-row">
+                          <label>条件键</label>
+                          <input type="text" class="edit-input" placeholder="例: fear_level"
+                            value={branch.condition ? Object.keys(branch.condition)[0] || '' : ''}
+                            on:input={(e) => updateBranchConditionKey(node.id, bi, branch.condition, e.currentTarget.value)} />
+                        </div>
+                        <div class="edit-row">
+                          <label>条件值</label>
+                          <input type="text" class="edit-input" placeholder="例: 5 或 true"
+                            value={branch.condition ? Object.values(branch.condition)[0] ?? '' : ''}
+                            on:input={(e) => updateBranchConditionValue(node.id, bi, branch.condition, e.currentTarget.value)} />
+                        </div>
+                      </div>
+                    {/each}
+                  {:else}
+                    <div class="empty-hint sm">无条件分支，点击"+ 添加分支"创建</div>
+                  {/if}
+                </div>
 
                 {#if node.danmakus && node.danmakus.length > 0}
                   <div class="edit-section">
@@ -718,6 +859,11 @@
                     {#each danmakuPresetTemplates as dmTpl}
                       <button class="xs-btn tpl" on:click={() => handleApplyDanmakuTemplate(node.id, dmTpl.id)}>
                         💬 {dmTpl.name}
+                      </button>
+                    {/each}
+                    {#each $currentDanmakuTemplates as customDmTpl}
+                      <button class="xs-btn tpl custom-tpl-btn" on:click={() => handleApplyCustomDanmakuTpl(node.id, customDmTpl.id)}>
+                        🎨 {customDmTpl.name}
                       </button>
                     {/each}
                   </div>
@@ -868,16 +1014,49 @@
               {#if $currentDanmakuTemplates.length > 0}
                 <div class="template-grid">
                   {#each $currentDanmakuTemplates as tpl}
-                    <div class="template-card custom">
-                      <h5 class="tpl-name">{tpl.name}</h5>
-                      <p class="tpl-desc">{tpl.description}</p>
+                    <div class="template-card custom" class:expanded={$workshopState.selectedDanmakuTemplateId === tpl.id}>
+                      <div class="tpl-card-header">
+                        <div>
+                          <h5 class="tpl-name">{tpl.name}</h5>
+                          <p class="tpl-desc">{tpl.description}</p>
+                        </div>
+                        <div class="tpl-card-actions">
+                          <button class="xs-btn" on:click={() => selectDanmakuTemplate($workshopState.selectedDanmakuTemplateId === tpl.id ? null : tpl.id)}>
+                            {$workshopState.selectedDanmakuTemplateId === tpl.id ? '收起' : '编辑'}
+                          </button>
+                          <button class="del-sm-btn" on:click={() => handleDeleteCustomDanmakuTpl(tpl.id)}>✕</button>
+                        </div>
+                      </div>
                       <div class="tpl-preview">
-                        {#each tpl.danmakus as dm}
+                        {#each tpl.danmakus as dm, di}
                           <div class="tpl-dm" style="color: {dm.color || '#66ccff'}">
-                            <span class="dm-user">{dm.username}</span>: {dm.content}
+                            {#if $workshopState.selectedDanmakuTemplateId === tpl.id}
+                              <div class="dm-edit-row">
+                                <input type="text" class="edit-input xs" value={dm.username} placeholder="用户名"
+                                  on:input={(e) => updateDanmakuInTemplate(tpl.id, di, { username: e.currentTarget.value })} />
+                                <input type="text" class="edit-input sm" value={dm.content} placeholder="内容"
+                                  on:input={(e) => updateDanmakuInTemplate(tpl.id, di, { content: e.currentTarget.value })} />
+                                <input type="color" class="color-input xs" value={dm.color || '#66ccff'}
+                                  on:input={(e) => updateDanmakuInTemplate(tpl.id, di, { color: e.currentTarget.value })} />
+                                <button class="del-sm-btn xs" on:click={() => handleDeleteDanmakuFromTpl(tpl.id, di)}>✕</button>
+                              </div>
+                            {:else}
+                              <span class="dm-user">{dm.username}</span>: {dm.content}
+                            {/if}
                           </div>
                         {/each}
                       </div>
+                      {#if $workshopState.selectedDanmakuTemplateId === tpl.id}
+                        <div class="tpl-edit-actions">
+                          <button class="xs-btn" on:click={() => handleAddDanmakuToTpl(tpl.id)}>+ 添加弹幕</button>
+                          <div class="tpl-meta-edit">
+                            <input type="text" class="edit-input sm" value={tpl.name} placeholder="模板名"
+                              on:input={(e) => updateCustomDanmakuTemplate(tpl.id, { name: e.currentTarget.value })} />
+                            <input type="text" class="edit-input sm" value={tpl.description} placeholder="描述"
+                              on:input={(e) => updateCustomDanmakuTemplate(tpl.id, { description: e.currentTarget.value })} />
+                          </div>
+                        </div>
+                      {/if}
                       <p class="tpl-count">{tpl.danmakus.length} 条弹幕</p>
                     </div>
                   {/each}
@@ -921,19 +1100,60 @@
               {#if $currentSfxTemplates.length > 0}
                 <div class="template-grid">
                   {#each $currentSfxTemplates as tpl}
-                    <div class="template-card custom">
-                      <h5 class="tpl-name">{tpl.name}</h5>
-                      <p class="tpl-desc">{tpl.description}</p>
+                    <div class="template-card custom" class:expanded={$workshopState.selectedSfxTemplateId === tpl.id}>
+                      <div class="tpl-card-header">
+                        <div>
+                          <h5 class="tpl-name">{tpl.name}</h5>
+                          <p class="tpl-desc">{tpl.description}</p>
+                        </div>
+                        <div class="tpl-card-actions">
+                          <button class="xs-btn" on:click={() => selectSfxTemplate($workshopState.selectedSfxTemplateId === tpl.id ? null : tpl.id)}>
+                            {$workshopState.selectedSfxTemplateId === tpl.id ? '收起' : '编辑'}
+                          </button>
+                          <button class="del-sm-btn" on:click={() => handleDeleteCustomSfxTpl(tpl.id)}>✕</button>
+                        </div>
+                      </div>
                       <div class="tpl-sfx-list">
-                        {#each tpl.triggers as t, i}
+                        {#each tpl.triggers as t, ti}
                           <div class="tpl-sfx-item">
-                            <span class="sfx-idx">{i + 1}.</span>
-                            <span class="sfx-name">{t.sfx}</span>
-                            <span class="sfx-delay">延迟 {t.delay || 0}ms</span>
-                            <span class="sfx-vol">音量 {t.volume ?? 0.8}</span>
+                            {#if $workshopState.selectedSfxTemplateId === tpl.id}
+                              <div class="sfx-edit-row">
+                                <select class="edit-select xs" value={t.sfx}
+                                  on:change={(e) => updateTriggerInSfxTemplate(tpl.id, ti, { sfx: asSFX(e.currentTarget.value) || 'click' })}>
+                                  {#each SFX_OPTIONS as s}
+                                    <option value={s}>{s}</option>
+                                  {/each}
+                                </select>
+                                <label class="inline-label">延迟
+                                  <input type="number" class="edit-input xs" value={t.delay || 0} min="0"
+                                    on:input={(e) => updateTriggerInSfxTemplate(tpl.id, ti, { delay: parseInt(e.currentTarget.value) || 0 })} />
+                                </label>
+                                <label class="inline-label">音量
+                                  <input type="number" class="edit-input xs" value={t.volume ?? 0.8} min="0" max="1" step="0.1"
+                                    on:input={(e) => updateTriggerInSfxTemplate(tpl.id, ti, { volume: parseFloat(e.currentTarget.value) || 0.8 })} />
+                                </label>
+                                <button class="del-sm-btn xs" on:click={() => handleDeleteTriggerFromSfxTpl(tpl.id, ti)}>✕</button>
+                              </div>
+                            {:else}
+                              <span class="sfx-idx">{ti + 1}.</span>
+                              <span class="sfx-name">{t.sfx}</span>
+                              <span class="sfx-delay">延迟 {t.delay || 0}ms</span>
+                              <span class="sfx-vol">音量 {t.volume ?? 0.8}</span>
+                            {/if}
                           </div>
                         {/each}
                       </div>
+                      {#if $workshopState.selectedSfxTemplateId === tpl.id}
+                        <div class="tpl-edit-actions">
+                          <button class="xs-btn" on:click={() => handleAddTriggerToSfxTpl(tpl.id)}>+ 添加触发器</button>
+                          <div class="tpl-meta-edit">
+                            <input type="text" class="edit-input sm" value={tpl.name} placeholder="模板名"
+                              on:input={(e) => updateCustomSfxTemplate(tpl.id, { name: e.currentTarget.value })} />
+                            <input type="text" class="edit-input sm" value={tpl.description} placeholder="描述"
+                              on:input={(e) => updateCustomSfxTemplate(tpl.id, { description: e.currentTarget.value })} />
+                          </div>
+                        </div>
+                      {/if}
                     </div>
                   {/each}
                 </div>
@@ -1638,6 +1858,97 @@
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+  }
+
+  .branch-card {
+    padding: 10px 14px;
+    background: rgba(20, 10, 40, 0.5);
+    border: 1px solid rgba(140, 100, 200, 0.2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+
+  .branch-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    color: #a080c0;
+    font-weight: 600;
+  }
+
+  .tpl-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .tpl-card-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .template-card.expanded {
+    border-color: rgba(100, 200, 160, 0.5);
+    background: rgba(15, 30, 50, 0.9);
+  }
+
+  .dm-edit-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .sfx-edit-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .inline-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #7090b0;
+  }
+
+  .tpl-edit-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(60, 130, 200, 0.15);
+  }
+
+  .tpl-meta-edit {
+    display: flex;
+    gap: 4px;
+  }
+
+  .custom-tpl-btn {
+    background: rgba(100, 200, 160, 0.15) !important;
+    border-color: rgba(100, 200, 160, 0.3) !important;
+    color: #80d0a0 !important;
+  }
+
+  .del-sm-btn.xs {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    font-size: 0.6rem;
+    padding: 0;
+  }
+
+  .empty-hint.sm {
+    font-size: 0.7rem;
+    padding: 8px;
   }
 
   .branch-panel, .template-panel, .validate-panel, .share-panel {
