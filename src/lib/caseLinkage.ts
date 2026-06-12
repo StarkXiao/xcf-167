@@ -307,9 +307,31 @@ export function saveCurrentCaseState(): void {
   if (!activeCaseId) return;
 
   const gs = get(gameState);
+  const def = caseDefinitions[activeCaseId];
+
+  const sharedVarUpdates: Record<string, SharedVariable> = {};
+  Object.entries(gs.variables).forEach(([key, value]) => {
+    if (key.startsWith('shared_') && def) {
+      if (!state.sharedVariables[key] || state.sharedVariables[key].value !== value) {
+        sharedVarUpdates[key] = {
+          key,
+          value,
+          sourceCaseId: activeCaseId,
+          description: `从 ${def.title} 设置的共享变量`,
+          affectsCases: def.relatedCaseIds,
+          isPersistent: true,
+          lastUpdatedAt: Date.now()
+        };
+      }
+    }
+  });
 
   caseLinkageState.update(s => ({
     ...s,
+    sharedVariables: {
+      ...s.sharedVariables,
+      ...sharedVarUpdates
+    },
     cases: {
       ...s.cases,
       [activeCaseId]: {
@@ -532,10 +554,18 @@ export function processNodeEffectsForCaseLinkage(nodeId: string): void {
       }
 
       if (key.startsWith('cross_case_clue_')) {
-        const clueIndex = parseInt(key.split('_').pop() || '0', 10);
-        const crossClueIds = def.crossCaseClueIds;
-        if (crossClueIds[clueIndex]) {
-          unlockCrossCaseClue(crossClueIds[clueIndex], activeCaseId);
+        const suffix = key.substring('cross_case_clue_'.length);
+        
+        if (/^\d+$/.test(suffix)) {
+          const clueIndex = parseInt(suffix, 10);
+          const crossClueIds = def.crossCaseClueIds;
+          if (crossClueIds[clueIndex]) {
+            unlockCrossCaseClue(crossClueIds[clueIndex], activeCaseId);
+          }
+        } else {
+          if (crossCaseClues.find(c => c.id === suffix)) {
+            unlockCrossCaseClue(suffix, activeCaseId);
+          }
         }
       }
     });

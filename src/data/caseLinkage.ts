@@ -168,7 +168,7 @@ const pioneerNodes = [
     dialogues: [
       mkLine('', '你拼凑出了所有线索，但一切都太晚了。\n先驱者号在8700米深处解体，无人生还。\n公司对外宣布为"机械故障"，你的报告被永久封存。\n\n三年后，同样的坐标，同样的深度，深渊号开始下潜...', { sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }], mood: 'scared' })
     ],
-    effects: { cross_case_clue_1: true }
+    effects: { cross_case_clue_cross_protocol07: true }
   },
   {
     id: 'pioneer_ending_silence',
@@ -189,7 +189,7 @@ const pioneerNodes = [
     dialogues: [
       mkLine('', '你用最后一丝力气，将所有数据发送了出去。\n信号穿过8700米的深海，消失在茫茫电波中。\n\n没人知道这份数据去了哪里。\n直到三年后，一个匿名邮箱收到了它。\n\n你的牺牲，没有白费。', { sfx: [{ sfx: 'notify', delay: 0, volume: 0.6 }], mood: 'calm' })
     ],
-    effects: { cross_case_clue_2: true, shared_warning_sent: true }
+    effects: { cross_case_clue_cross_creature: true, shared_warning_sent: true }
   }
 ];
 

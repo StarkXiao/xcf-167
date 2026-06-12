@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { caseLinkageState, availableCases, closeCaseSelection, getCaseProgress, getOverallProgress, unlockedMainStoryBeats, openClueBoard, openMainStoryReveal } from '../lib/caseLinkage';
+  import { caseLinkageState, availableCases, closeCaseSelection, getCaseProgress, getOverallProgress, unlockedMainStoryBeats, openClueBoard, openMainStoryReveal, closeMainStoryReveal } from '../lib/caseLinkage';
   import { caseDefinitions, crossCaseClues } from '../data/caseLinkage';
   import { CROSS_CASE_CATEGORY_LABELS, CASE_THEMES } from '../types/caseLinkage';
-  import type { CaseId, CaseState } from '../types/caseLinkage';
+  import type { CaseId, CaseState, MainStoryBeat } from '../types/caseLinkage';
   import { get } from 'svelte/store';
 
   const dispatch = createEventDispatcher();
@@ -12,6 +12,7 @@
 
   let selectedCaseId: CaseId | null = null;
   let showCaseDetail = false;
+  let selectedBeat: MainStoryBeat | null = null;
 
   const getStatusLabel = (status: string): string => {
     const labels: Record<string, string> = {
@@ -80,6 +81,26 @@
   const getClueById = (clueId: string) => crossCaseClues.find(c => c.id === clueId);
   const isEndingUnlocked = (caseState: CaseState | null, endingId: string) => caseState ? caseState.unlockedEndings.includes(endingId) : false;
   const isSelectedEndingUnlocked = (endingId: string) => isEndingUnlocked(getSelectedCaseState(), endingId);
+
+  const handleTimelineBeatClick = (beat: MainStoryBeat) => {
+    if (beat.isUnlocked) {
+      selectedBeat = beat;
+      openMainStoryReveal();
+    }
+  };
+
+  const handleCloseMainStoryReveal = () => {
+    closeMainStoryReveal();
+    selectedBeat = null;
+  };
+
+  const handleOpenMainStoryButton = () => {
+    const unlocked = $unlockedMainStoryBeats;
+    if (unlocked.length > 0) {
+      selectedBeat = unlocked[unlocked.length - 1];
+      openMainStoryReveal();
+    }
+  };
 </script>
 
 {#if $caseLinkageState.isCaseSelectionOpen}
@@ -101,7 +122,7 @@
           <button class="icon-btn" on:click={onOpenClueBoard} title="跨案线索板">
             🔗 线索
           </button>
-          <button class="icon-btn" on:click={openMainStoryReveal} title="主线剧情">
+          <button class="icon-btn" on:click={handleOpenMainStoryButton} title="主线剧情">
             📜 主线
           </button>
           <button class="close-btn" on:click={handleClose}>✕</button>
@@ -109,10 +130,10 @@
       </div>
 
       <div class="main-story-timeline">
-        <h3 class="section-title">📖 主线进展</h3>
+        <h3 class="section-title">📖 主线进展 <span class="section-hint">（点击查看详情）</span></h3>
         <div class="timeline-container">
           {#each $unlockedMainStoryBeats as beat}
-            <div class="timeline-item unlocked">
+            <div class="timeline-item unlocked" on:click={() => handleTimelineBeatClick(beat)}>
               <div class="timeline-dot">✓</div>
               <div class="timeline-content">
                 <div class="timeline-title">{beat.title}</div>
@@ -330,6 +351,74 @@
                 </button>
                 <button class="primary-btn" on:click={handleStartCase}>
                   {getSelectedCaseState()?.status === 'in_progress' ? '继续调查' : '开始调查'}
+                </button>
+              </div>
+            </div>
+          </div>
+      {/if}
+
+      {#if $caseLinkageState.isMainStoryRevealOpen && selectedBeat}
+          <div class="main-story-overlay" on:click|self={handleCloseMainStoryReveal}>
+            <div class="main-story-modal">
+              <div class="main-story-header">
+                <div class="main-story-title-section">
+                  <span class="main-story-icon">📜</span>
+                  <div>
+                    <h2>{selectedBeat.title}</h2>
+                    <p class="main-story-subtitle">主线章节 · 第 {selectedBeat.order + 1} 章</p>
+                  </div>
+                </div>
+                <button class="close-btn" on:click={handleCloseMainStoryReveal}>✕</button>
+              </div>
+
+              <div class="main-story-content">
+                <div class="reveal-text">
+                  {selectedBeat.revealContent}
+                </div>
+
+                <div class="main-story-meta">
+                  {#if selectedBeat.requiredClues.length > 0}
+                    <div class="meta-section">
+                      <h5>🔍 关键线索</h5>
+                      <div class="meta-items">
+                        {#each selectedBeat.requiredClues as clueId}
+                          {#if getClueById(clueId)}
+                            <span class="meta-tag unlocked">
+                              ✓ {getClueById(clueId)?.title}
+                            </span>
+                          {/if}
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if selectedBeat.requiredCases.length > 0}
+                    <div class="meta-section">
+                      <h5>📂 前置案件</h5>
+                      <div class="meta-items">
+                        {#each selectedBeat.requiredCases as caseId}
+                          {#if getCaseDef(caseId)}
+                            <span class="meta-tag unlocked">
+                              ✓ {getCaseDef(caseId)?.title}
+                            </span>
+                          {/if}
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+
+                {#if $caseLinkageState.mainStoryCompleted}
+                  <div class="final-revelation">
+                    <h4>🎉 全部主线章节已解锁！</h4>
+                    <p>你已揭开深海之下的全部真相。但这真的是结束吗？</p>
+                  </div>
+                {/if}
+              </div>
+
+              <div class="main-story-footer">
+                <button class="primary-btn" on:click={handleCloseMainStoryReveal}>
+                  继续调查
                 </button>
               </div>
             </div>
@@ -1002,5 +1091,170 @@
 .primary-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(255, 102, 179, 0.4);
+}
+
+.section-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+.timeline-item.unlocked {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.timeline-item.unlocked:hover {
+  transform: translateX(4px);
+  background: rgba(77, 166, 255, 0.2);
+  border-left-color: #80bfff;
+}
+
+.main-story-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+}
+
+.main-story-modal {
+  width: 85%;
+  max-width: 700px;
+  max-height: 85vh;
+  background: linear-gradient(135deg, #0f0f2e 0%, #1a1a4a 50%, #2a1a4a 100%);
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 100px rgba(100, 100, 255, 0.3), inset 0 0 60px rgba(100, 100, 255, 0.05);
+  border: 2px solid rgba(150, 100, 255, 0.4);
+}
+
+.main-story-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 36px;
+  background: linear-gradient(90deg, rgba(60, 40, 120, 0.6) 0%, rgba(80, 40, 140, 0.6) 100%);
+  border-bottom: 1px solid rgba(150, 100, 255, 0.3);
+}
+
+.main-story-title-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.main-story-icon {
+  font-size: 48px;
+  filter: drop-shadow(0 0 20px rgba(150, 100, 255, 0.6));
+}
+
+.main-story-title-section h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #fff;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(150, 100, 255, 0.5);
+}
+
+.main-story-subtitle {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  color: #b388ff;
+  letter-spacing: 3px;
+}
+
+.main-story-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px;
+}
+
+.reveal-text {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 2;
+  white-space: pre-wrap;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  border-left: 4px solid #b388ff;
+  margin-bottom: 28px;
+  letter-spacing: 0.5px;
+}
+
+.main-story-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.meta-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #b388ff;
+  letter-spacing: 1px;
+}
+
+.meta-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meta-tag {
+  padding: 8px 16px;
+  background: rgba(100, 200, 100, 0.15);
+  border: 1px solid rgba(100, 200, 100, 0.4);
+  border-radius: 20px;
+  font-size: 13px;
+  color: #90ee90;
+}
+
+.final-revelation {
+  margin-top: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(255, 200, 100, 0.1) 0%, rgba(255, 150, 50, 0.15) 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 200, 100, 0.4);
+  text-align: center;
+}
+
+.final-revelation h4 {
+  margin: 0 0 10px 0;
+  font-size: 20px;
+  color: #ffcc66;
+  text-shadow: 0 0 20px rgba(255, 200, 100, 0.4);
+}
+
+.final-revelation p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.main-story-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 36px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(150, 100, 255, 0.2);
+}
+
+.main-story-footer .primary-btn {
+  background: linear-gradient(135deg, #8844ff, #b366ff);
+  padding: 14px 48px;
+  font-size: 15px;
+  letter-spacing: 2px;
+}
+
+.main-story-footer .primary-btn:hover {
+  box-shadow: 0 4px 30px rgba(150, 100, 255, 0.5);
 }
 </style>
