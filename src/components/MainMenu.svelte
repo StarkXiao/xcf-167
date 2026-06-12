@@ -16,6 +16,7 @@
   export let onShowArchive: () => void;
   export let onShowWorldview: () => void;
   export let onOpenEditor: () => void;
+  export let onShowCaseLinkage: () => void;
 
   let saveSlots: SaveSlot[] = [];
   let showLoadMenu = false;
@@ -87,6 +88,11 @@
   function handleEditor() {
     playSFX('select');
     onOpenEditor();
+  }
+
+  function handleCaseLinkage() {
+    playSFX('select');
+    onShowCaseLinkage();
   }
 
   function backToMenu() {
@@ -191,6 +197,14 @@
         <button class="menu-btn" on:click={handleWorldview}>
           <span class="btn-icon">📚</span>
           <span class="btn-text">世界观百科</span>
+        </button>
+
+        <button class="menu-btn case-linkage-btn" on:click={handleCaseLinkage}>
+          <span class="btn-icon">🔗</span>
+          <span class="btn-text">
+            多案件联动篇
+            <span class="menu-badge new">NEW</span>
+          </span>
         </button>
 
         <button class="menu-btn" on:click={handleSettings}>
@@ -583,5 +597,24 @@
   .menu-btn.editor-btn:hover, .menu-btn.editor-btn:active {
     background: linear-gradient(135deg, rgba(0, 200, 160, 0.3), rgba(0, 150, 120, 0.2));
     border-color: rgba(0, 255, 200, 0.6);
+  }
+
+  .menu-btn.case-linkage-btn {
+    background: linear-gradient(135deg, rgba(179, 102, 255, 0.15), rgba(77, 166, 255, 0.1));
+    border-color: rgba(179, 102, 255, 0.3);
+  }
+
+  .menu-btn.case-linkage-btn:hover, .menu-btn.case-linkage-btn:active {
+    background: linear-gradient(135deg, rgba(179, 102, 255, 0.3), rgba(77, 166, 255, 0.2));
+    border-color: rgba(179, 102, 255, 0.6);
+  }
+
+  .menu-badge.new {
+    background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    animation: pulse 2s infinite;
   }
 </style>

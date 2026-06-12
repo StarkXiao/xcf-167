@@ -10,6 +10,8 @@
   import ArchiveHub from './components/ArchiveHub.svelte';
   import WorldviewEncyclopedia from './components/WorldviewEncyclopedia.svelte';
   import EditorHub from './components/editor/EditorHub.svelte';
+  import CaseSelection from './components/CaseSelection.svelte';
+  import ClueBoard from './components/ClueBoard.svelte';
   import { gameState, resetGameState, loadState } from './lib/store';
   import { goToNode, triggerDanmakusForDialogue, getCurrentNode } from './lib/engine';
   import { initAudio, stopBGM } from './lib/audio';
@@ -25,7 +27,14 @@
     getCurrentReplayChapter
   } from './lib/chapterReview';
   import { currentPlaythrough } from './lib/memory';
+  import {
+    openCaseSelection,
+    openClueBoard,
+    switchToCase,
+    initializeCaseLinkage as initCaseLinkage
+  } from './lib/caseLinkage';
   import type { GameScene as GameSceneType, SaveSlot, ChapterDefinition, ChapterSaveSlot, ChapterNodeSnapshot } from './types/game';
+  import type { CaseId } from './types/caseLinkage';
   import { get } from 'svelte/store';
 
   type AppScene = GameSceneType | 'editor';
@@ -221,6 +230,23 @@
     scene = 'menu';
   }
 
+  function handleShowCaseLinkage() {
+    initCaseLinkage();
+    openCaseSelection();
+  }
+
+  function handleStartCase(caseId: CaseId) {
+    switchToCase(caseId);
+    scene = 'playing';
+    setTimeout(() => {
+      triggerDanmakusForDialogue(0);
+    }, 200);
+  }
+
+  function handleOpenClueBoard() {
+    openClueBoard();
+  }
+
   onMount(() => {
     initAudio();
   });
@@ -238,6 +264,7 @@
       onShowArchive={handleShowArchive}
       onShowWorldview={handleShowWorldview}
       onOpenEditor={handleOpenEditor}
+      onShowCaseLinkage={handleShowCaseLinkage}
     />
   {:else if scene === 'playing'}
     <GameScene 
@@ -268,6 +295,8 @@
   />
   <ArchiveHub isOpen={showArchive} onClose={handleCloseArchive} />
   <WorldviewEncyclopedia isOpen={showWorldview} onClose={handleCloseWorldview} />
+  <CaseSelection onStartCase={handleStartCase} onOpenClueBoard={handleOpenClueBoard} />
+  <ClueBoard />
 </div>
 
 <style>

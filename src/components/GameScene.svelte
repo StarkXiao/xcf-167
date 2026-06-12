@@ -108,6 +108,12 @@
     deleteChapterSave,
     recordReplayNodeSnapshot
   } from '../lib/chapterReview';
+  import {
+    caseLinkageState,
+    openCaseSelection,
+    openClueBoard,
+    unlockedCrossCaseClues
+  } from '../lib/caseLinkage';
   import type { SaveSlot, StoryNode, DialogueLine, Choice, Ending, MoodType, RewindCheckpoint, CrewStoryNode, CrewPerspectiveId } from '../types/game';
   import { getNode, rewindToCheckpoint, getCurrentCrewNode, isCrewNode } from '../lib/engine';
   import { currentCrewPerspective, crewMentalStates } from '../lib/store';
@@ -393,6 +399,16 @@
       if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel && !showRewindPanel) {
         playSFX('keyboard');
         openTerminalLog();
+      }
+    } else if (e.key === 'c' || e.key === 'C') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel && !showRewindPanel) {
+        playSFX('select');
+        openCaseSelection();
+      }
+    } else if (e.key === 'l' || e.key === 'L') {
+      if (!isEnding && !showGameMenu && !$evidenceBoard.isBoardOpen && !showTrustPanel && !showRewindPanel) {
+        playSFX('notify');
+        openClueBoard();
       }
     } else if (e.key === ' ' || e.key === 'Enter') {
       if (!$evidenceBoard.isBoardOpen && !showChoices && !isEnding && !showGameMenu && !showTrustPanel && !showRewindPanel && !$anonymousSenderState.isMailboxOpen && !$anonymousSenderState.isTerminalOpen) {
@@ -731,6 +747,27 @@
     >
       ⏪
     </button>
+    {#if $caseLinkageState.activeCaseId}
+      <button 
+        class="case-switch-toggle"
+        on:click|stopPropagation={() => { playSFX('select'); openCaseSelection(); }}
+      >
+        🔗
+        <span class="case-indicator">
+          {$caseLinkageState.activeCaseId === 'case_pioneer' ? '先驱' : 
+           $caseLinkageState.activeCaseId === 'case_abyss' ? '深渊' : '幻影'}
+        </span>
+      </button>
+      <button 
+        class="clue-board-toggle"
+        on:click|stopPropagation={() => { playSFX('notify'); openClueBoard(); }}
+      >
+        📊
+        {#if $unlockedCrossCaseClues.length > 0}
+          <span class="clue-board-badge">{$unlockedCrossCaseClues.length}</span>
+        {/if}
+      </button>
+    {/if}
     {#if $isInChapterReplay}
       <button 
         class="chapter-save-toggle"
@@ -1196,6 +1233,33 @@
       right: 176px;
       font-size: 0.9rem;
     }
+
+    .rewind-toggle {
+      width: 36px;
+      height: 36px;
+      right: 216px;
+      font-size: 0.9rem;
+    }
+
+    .case-switch-toggle {
+      width: auto;
+      min-width: 36px;
+      height: 36px;
+      right: 256px;
+      font-size: 0.8rem;
+      padding: 0 6px;
+    }
+
+    .case-indicator {
+      font-size: 0.6rem;
+    }
+
+    .clue-board-toggle {
+      width: 36px;
+      height: 36px;
+      right: 324px;
+      font-size: 0.9rem;
+    }
   }
 
   .mail-toggle {
@@ -1350,6 +1414,87 @@
   @keyframes rewindPulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
+  }
+
+  .case-switch-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 304px;
+    width: auto;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+    background: linear-gradient(135deg, rgba(179, 102, 255, 0.2), rgba(77, 166, 255, 0.15));
+    border: 1px solid rgba(179, 102, 255, 0.4);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.2s;
+    color: #fff;
+  }
+
+  .case-switch-toggle:hover, .case-switch-toggle:active {
+    background: linear-gradient(135deg, rgba(179, 102, 255, 0.4), rgba(77, 166, 255, 0.3));
+    border-color: rgba(179, 102, 255, 0.7);
+    box-shadow: 0 0 15px rgba(179, 102, 255, 0.3);
+  }
+
+  .case-indicator {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .clue-board-toggle {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 392px;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, rgba(77, 166, 255, 0.2), rgba(179, 102, 255, 0.15));
+    border: 1px solid rgba(77, 166, 255, 0.4);
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 40;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .clue-board-toggle:hover, .clue-board-toggle:active {
+    background: linear-gradient(135deg, rgba(77, 166, 255, 0.4), rgba(179, 102, 255, 0.3));
+    border-color: rgba(77, 166, 255, 0.7);
+    box-shadow: 0 0 15px rgba(77, 166, 255, 0.3);
+  }
+
+  .clue-board-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #4da6ff, #b366ff);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 6px rgba(77, 166, 255, 0.5);
   }
 
   .stability-indicator {

@@ -21,6 +21,7 @@ import type {
 } from '../types/game';
 import { storyData } from '../data/story';
 import { crewStoryData } from '../data/crewStory';
+import { caseDefinitions } from '../data/caseLinkage';
 import {
   gameState,
   setCurrentNode,
@@ -69,13 +70,36 @@ import {
 } from './timeRewind';
 import { checkAndUnlockAchievements, recordChoice, recordMisjudgment, getPlaythroughDataForRecord, resetPlaythroughTracking, setCurrentPath } from './achievements';
 import { applyDamageEffects, applyRepairEffects, resetHullDamage } from './hullDamage';
+import {
+  processNodeEffectsForCaseLinkage,
+  recordCaseChoice,
+  caseLinkageState,
+  saveCurrentCaseState
+} from './caseLinkage';
+
+const getAllCaseNodes = (): StoryNode[] => {
+  const nodes: StoryNode[] = [];
+  Object.values(caseDefinitions).forEach(caseDef => {
+    nodes.push(...caseDef.nodes);
+  });
+  return nodes;
+};
+
+const getAllCaseEndings = () => {
+  const endings: any[] = [];
+  Object.values(caseDefinitions).forEach(caseDef => {
+    endings.push(...caseDef.endings);
+  });
+  return endings;
+};
 
 const allNodes: StoryNode[] = [
   ...storyData.nodes,
-  ...crewStoryData.nodes as StoryNode[]
+  ...crewStoryData.nodes as StoryNode[],
+  ...getAllCaseNodes()
 ];
 
-const allEndings = [...storyData.endings, ...crewStoryData.endings as any[]];
+const allEndings = [...storyData.endings, ...crewStoryData.endings as any[], ...getAllCaseEndings()];
 
 export function isCrewNode(node: StoryNode): node is CrewStoryNode {
   return !!(node as CrewStoryNode).perspectiveId;
@@ -533,6 +557,11 @@ export function selectChoice(choiceId: string): void {
   processChoiceMemoryEffect(choice);
   applyChoiceWeightModifier(node.id, choiceId);
   recordChoice(node.id, choiceId);
+
+  const clState = get(caseLinkageState);
+  if (clState.activeCaseId) {
+    recordCaseChoice(clState.activeCaseId, node.id, choiceId);
+  }
   
   if (choiceId === 'c_keep_live' || choiceId === 'c_keep_live_2') {
     setCurrentPath('live');
@@ -621,6 +650,13 @@ export function goToNode(nodeId: string): void {
   regenerateStability();
 
   triggerNodeMemoryHints(targetNode);
+
+  processNodeEffectsForCaseLinkage(nodeId);
+
+  const clState = get(caseLinkageState);
+  if (clState.activeCaseId) {
+    saveCurrentCaseState();
+  }
 
   if (targetNode.dialogues && targetNode.dialogues.length > 0) {
     triggerMemoryAudioHints(targetNode.dialogues[0]);
