@@ -274,6 +274,21 @@
     }
   }
 
+  function handlePlayerAreaKeydown(e: KeyboardEvent) {
+    if ((e.key === 'Enter' || e.key === ' ') && !showChoices && !isEnding) {
+      e.preventDefault();
+      handlePlayerAreaClick();
+    }
+  }
+
+  function handleAlertKeydown(e: KeyboardEvent, alertId: string) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissAlert(alertId);
+    }
+  }
+
   function handleTogglePlay() {
     triggerHaptic('light');
     togglePlay();
@@ -383,7 +398,15 @@
   }
 </script>
 
-<div class="podcast-player" on:click={handlePlayerAreaClick}>
+<div class="podcast-player" role="region" aria-label="播客播放区域">
+  <div
+    class="player-click-overlay"
+    role="button"
+    aria-label="推进对话"
+    tabindex="0"
+    on:click={handlePlayerAreaClick}
+    on:keydown={handlePlayerAreaKeydown}
+  ></div>
   <PodcastBackground 
     mood={currentDialogue?.mood || 'calm'} 
     corruption={$signalCorruption.level}
@@ -486,18 +509,21 @@
   {#if $activeAlerts.length > 0}
     <div class="damage-alerts">
       {#each $activeAlerts as alert (alert.id)}
-        <div 
+        <button
           class="damage-alert"
+          type="button"
           class:alert-warning={alert.severity === 'warning'}
           class:alert-critical={alert.severity === 'critical'}
           class:alert-offline={alert.severity === 'offline'}
+          aria-label={`关闭警报：${alert.message}`}
           on:click|stopPropagation={() => dismissAlert(alert.id)}
+          on:keydown|stopPropagation={(e) => handleAlertKeydown(e, alert.id)}
         >
           <span class="alert-icon">
             {#if alert.severity === 'offline'}✕{:else if alert.severity === 'critical'}⚠{:else}⚡{/if}
           </span>
           <span class="alert-text">{alert.message}</span>
-        </div>
+        </button>
       {/each}
     </div>
   {/if}
@@ -510,6 +536,13 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  .player-click-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: transparent;
   }
 
   .podcast-header {

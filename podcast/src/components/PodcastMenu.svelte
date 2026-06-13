@@ -13,6 +13,26 @@
 
   let saveSlots: SaveSlot[] = [];
   let activeTab: 'saves' | 'settings' = 'saves';
+  const SUBTITLE_SIZES: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
+
+  function handleSubtitleSize(size: 'small' | 'medium' | 'large') {
+    updatePodcastSetting('subtitleSize', size);
+    triggerHaptic('light');
+  }
+
+  function handleBackdropKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+      e.preventDefault();
+      handleClose();
+    }
+  }
+
+  function handleSaveItemKeydown(e: KeyboardEvent, slot: SaveSlot) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleLoadSlot(slot);
+    }
+  }
 
   $: autoPlay = $podcastSettings.autoPlay;
   $: showSubtitles = $podcastSettings.showSubtitles;
@@ -68,8 +88,15 @@
 </script>
 
 {#if isOpen}
-  <div class="menu-backdrop" on:click={handleClose}>
-    <div class="menu-panel" on:click|stopPropagation>
+  <div
+    class="menu-backdrop"
+    role="button"
+    aria-label="关闭菜单"
+    tabindex="0"
+    on:click={handleClose}
+    on:keydown={handleBackdropKeydown}
+  >
+    <div class="menu-panel" role="dialog" aria-modal="true" aria-label="播客菜单">
       <div class="menu-header">
         <h2 class="menu-title">深渊回响</h2>
         <button class="menu-close" on:click={handleClose}>✕</button>
@@ -104,7 +131,14 @@
               <div class="saves-list">
                 {#each saveSlots as slot (slot.id)}
                   <div class="save-item">
-                    <div class="save-info" on:click={() => handleLoadSlot(slot)}>
+                    <div
+                      class="save-info"
+                      role="button"
+                      tabindex="0"
+                      aria-label={`读取存档：${slot.preview || '无预览'}`}
+                      on:click={() => handleLoadSlot(slot)}
+                      on:keydown={(e) => handleSaveItemKeydown(e, slot)}
+                    >
                       <div class="save-preview">{slot.preview || '无预览'}</div>
                       <div class="save-meta">
                         <span class="save-time">{formatTime(slot.savedAt)}</span>
@@ -149,12 +183,13 @@
 
             <div class="setting-item">
               <span class="setting-label">字幕大小</span>
-              <div class="size-selector">
-                {#each ['small', 'medium', 'large'] as size}
+              <div class="size-selector" role="group" aria-label="字幕大小选择">
+                {#each SUBTITLE_SIZES as size}
                   <button
                     class="size-btn"
                     class:active={subtitleSize === size}
-                    on:click={() => updatePodcastSetting('subtitleSize', size)}
+                    aria-pressed={subtitleSize === size}
+                    on:click={() => handleSubtitleSize(size)}
                   >
                     {size === 'small' ? '小' : size === 'medium' ? '中' : '大'}
                   </button>
