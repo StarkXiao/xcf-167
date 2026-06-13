@@ -1,0 +1,2011 @@
+import type { StoryNode, Ending, Danmaku, DialogueLine, DamageEffect, RepairEffect } from '../types/game';
+
+const mkDanmaku = (
+  id: string,
+  username: string,
+  content: string,
+  timestamp: number,
+  dialogueIndex?: number,
+  relativeMs?: number,
+  color?: string,
+  isImportant?: boolean,
+  isBackendOnly?: boolean
+): Danmaku => ({
+  id, username, content, timestamp, dialogueIndex, relativeMs, color, isImportant, isBackendOnly
+});
+
+const mkLine = (
+  speaker: string,
+  text: string,
+  opts: Partial<DialogueLine> = {}
+): DialogueLine => ({
+  speaker,
+  text,
+  ...opts
+});
+
+export const endings: Ending[] = [
+  { id: 'ending_truth', title: '深海真相', description: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。', isGood: true },
+  { id: 'ending_survival', title: '幸存者', description: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。', isGood: true },
+  { id: 'ending_silence', title: '永远的沉默', description: '潜艇最终消失在了马里亚纳海沟的最深处。没有人知道那天深海里到底发生了什么，只留下一段被截断的直播录像。', isGood: false },
+  { id: 'ending_madness', title: '深渊回响', description: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？', isGood: false },
+  { id: 'ending_loop', title: '无尽回放', description: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。', isGood: false },
+  { id: 'ending_conspiracy', title: '阴谋浮现', description: '信号解析揭开了冰山一角——这不是科考任务，而是一场精心策划的围猎。而猎物，不仅仅是深海中的那个东西。', isGood: false },
+  { id: 'ending_betrayal', title: '背叛者', description: '协议07的真相浮出水面：有人从一开始就知道一切。当你将证据指向那个方向时，你发现——背叛者比你想的更近。', isGood: false }
+];
+
+export const nodes: StoryNode[] = [
+  {
+    id: 'start',
+    title: '【深海直播·回放】',
+    background: 'intro',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '直播开场',
+    dialogues: [
+      mkLine('系统', '——正在恢复数据缓存——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1800
+      }),
+      mkLine('系统', '检测到异常中断，开始加载直播回放片段...', {
+        sfx: [{ sfx: 'radio_noise', delay: 0, volume: 0.5 }, { sfx: 'keyboard', delay: 300, volume: 0.5 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('系统', '直播ID：DEEP-2047-0612', {
+        sfx: [{ sfx: 'notify', delay: 0 }],
+        mood: 'normal',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('系统', '主播：阿海 | 观看人数峰值：2,847,291', {
+        sfx: [{ sfx: 'bubbles', delay: 200, volume: 0.4 }],
+        mood: 'normal',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('系统', '信号中断时间：03:17:42', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.3 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '你是一名数字取证分析师。三个月前，一场深海直播探险在全网直播中突然失联。\n今天，你收到了一份匿名邮件——里面是当时完整的直播数据备份。', {
+        sfx: [{ sfx: 'water_drip', delay: 500 }, { sfx: 'water_drip', delay: 2000 }],
+        mood: 'calm',
+        memoryVariants: [
+          {
+            memoryCondition: { playthroughAtLeast: 2 },
+            text: '你再次打开这份数据。上一次的分析让你发现了一些奇怪的线索...\n这一次，你决定从不同的角度重新审视一切。也许，真相就藏在那些被忽略的细节中。'
+          },
+          {
+            memoryCondition: { requiredClues: ['full_truth'] },
+            text: '你已经知道了全部真相——这是一场实验，而直播是实验的一部分。\n但你依然打开了这份数据。也许，还有什么被遗漏了？也许，这一次能救出更多人？\n屏幕角落的时间戳：03:17:42。它在对你微笑。'
+          }
+        ]
+      })
+    ],
+    nextNodeId: 'intro_1',
+    memoryHints: [
+      {
+        id: 'hint_whisper_ng',
+        memoryCondition: { playthroughAtLeast: 2 },
+        sfx: 'whisper',
+        volume: 0.3,
+        delay: 500,
+        oncePerPlaythrough: true
+      }
+    ],
+    danmakus: [
+      mkDanmaku('d1', '深海爱好者', '终于开播了！！', 0, 1, 200, '#66ccff'),
+      mkDanmaku('d2', '科技迷小王', '马里亚纳海沟？太敢了', 500, 1, 800),
+      mkDanmaku('d3', '夜猫子一号', '凌晨三点还有三百万人？', 1500, 2, 500, '#ff9999'),
+      mkDanmaku('d4', '潜水员老张', '这个深度...祝平安', 2500, 3, 800, '#99ff99', true),
+      mkDanmaku('d5', '路人甲', '弹幕护体！', 3500, 4, 300),
+      mkDanmaku('d6', '好奇心害死猫', '我有种不好的预感', 4500, 5, 1500, '#ffcc00'),
+      mkDanmaku('d_backend_1', '【后台】系统', '数据校验中...', 600, 1, 400, '#00ffcc', false, true),
+      mkDanmaku('d_backend_2', '【后台】监控', '检测到异常连接：观众数据源: 2847291 真实观众', 1800, 2, 800, '#00ffcc', false, true),
+      mkDanmaku('d_backend_3', '【后台】协议', '协议07已加载完毕', 3200, 3, 1200, '#00ffcc', false, true)
+    ]
+  },
+  {
+    id: 'intro_1',
+    title: '【直播开始】',
+    background: 'cockpit',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('阿海', '哈喽各位观众朋友们大家好！我是你们的深海探险家阿海！', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.3 }],
+        mood: 'normal'
+      }),
+      mkLine('阿海', '今天，我们的"深渊号"载人潜水器即将下潜至马里亚纳海沟10,000米深处！', {
+        sfx: [{ sfx: 'hull_pressure', delay: 0, volume: 0.4 }],
+        mood: 'normal'
+      }),
+      mkLine('阿海', '这将是人类历史上首次在这个深度进行全程直播！大家弹幕刷起来！', {
+        mood: 'urgent'
+      }),
+      mkLine('小林', '（小声）阿海，镜头角度调好了，声呐系统正常。', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.5 }],
+        mood: 'whisper'
+      }),
+      mkLine('阿海', '给大家介绍一下，这是我们的摄影师小林，负责记录全程画面。', {
+        mood: 'normal'
+      }),
+      mkLine('阿海', '驾驶舱后面是工程师老周，还有海洋生物学家苏博士。', {
+        sfx: [{ sfx: 'sonar', delay: 500, volume: 0.4 }],
+        mood: 'normal'
+      })
+    ],
+    nextNodeId: 'intro_2',
+    danmakus: [
+      mkDanmaku('d7', '前排占座', '第一！！', 0, 0, 150),
+      mkDanmaku('d8', '打工人睡不着', '阿海又整大活了', 300, 0, 800, '#66ccff'),
+      mkDanmaku('d9', '理科女生', '苏博士好帅a', 800, 4, 500, '#ff99cc'),
+      mkDanmaku('d10', '老周粉丝', '老周上次南极直播也在！稳！', 1500, 5, 300, '#99ff99'),
+      mkDanmaku('d11', '怀疑论者', '真的假的？不会是特效吧', 2500, 2, 600, '#cccccc'),
+      mkDanmaku('d12', '海迷001', '楼上不懂别乱说，阿海做这个十年了', 3200, 2, 1500, '#66ccff')
+    ],
+    effects: { intro_done: true }
+  },
+  {
+    id: 'intro_2',
+    title: '【下潜中 · 深度800米】',
+    background: 'descent',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '下潜800米',
+    dialogues: [
+      mkLine('老周', '深度800米，水压正常，船体一切正常。', {
+        sfx: [{ sfx: 'hull_pressure', delay: 0, volume: 0.5 }],
+        mood: 'calm',
+        trustEffect: {
+          changes: [{ target: 'laozhou', value: 5, reason: '专业报告' }],
+          hintText: '老周的冷静表现让你感到可靠'
+        }
+      }),
+      mkLine('苏博士', '看到了！一群管水母在左舷！', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
+        mood: 'urgent',
+        trustEffect: {
+          changes: [{ target: 'suboshi', value: 5, reason: '专业热情' }],
+          hintText: '苏博士对海洋生物的热情感染了你'
+        }
+      }),
+      mkLine('阿海', '观众朋友们看到了吗？这些生物在完全黑暗的环境中发着幽蓝的光——', {
+        mood: 'normal'
+      }),
+      mkLine('小林', '阿海，弹幕有观众问什么时候到海底。', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.4 }],
+        mood: 'normal'
+      }),
+      mkLine('阿海', '以现在的速度，大概还需要两个小时。大家别急，精彩的还在后面！', {
+        mood: 'normal'
+      }),
+      mkLine('系统', '【弹幕数量激增，系统启动关键词过滤...】', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.3 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1800
+      }),
+      mkLine('', '回放速度可以选择，但你的选择会影响信息获取量。你决定——', {
+        mood: 'calm'
+      })
+    ],
+    choices: [
+      {
+        id: 'c_fast',
+        text: '快进至下潜3000米',
+        nextNodeId: 'mid_dive',
+        effect: { watched_intro: false },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -5, reason: '跳过介绍' },
+            { target: 'xiaolin', value: -5, reason: '跳过介绍' }
+          ],
+          hintText: '你跳过了船员的自我介绍'
+        }
+      },
+      {
+        id: 'c_normal',
+        text: '正常速度继续观看',
+        nextNodeId: 'early_sign',
+        effect: { watched_intro: true, clue_count: 1 },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 5, reason: '耐心观看' },
+            { target: 'xiaolin', value: 5, reason: '耐心观看' },
+            { target: 'laozhou', value: 3, reason: '耐心观看' },
+            { target: 'suboshi', value: 3, reason: '耐心观看' }
+          ],
+          hintText: '你的耐心让你更了解每一位船员'
+        }
+      },
+      {
+        id: 'c_ng_hint',
+        text: '直接搜索弹幕关键词「07」',
+        memoryText: '【回忆线索】直接搜索弹幕关键词「协议07」',
+        nextNodeId: 'analyze_danmaku',
+        memoryCondition: { anyClues: ['previous_incident', 'crew_knew'], playthroughAtLeast: 2 },
+        condition: { clue_count: 1 },
+        effect: { watched_intro: true, clue_count: 2, clue_danmaku_deep: true },
+        memoryEffect: { clueToUnlock: 'protocol_hint_remembered' },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -10, reason: '怀疑隐瞒' },
+            { target: 'laozhou', value: -10, reason: '怀疑隐瞒' }
+          ],
+          hintText: '你直接怀疑苏博士和老周隐瞒了什么'
+        }
+      }
+    ]
+  },
+  {
+    id: 'early_sign',
+    title: '【下潜中 · 深度1500米】',
+    background: 'descent',
+    bgm: 'mystery',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '首次异常信号',
+    dialogues: [
+      mkLine('老周', '...奇怪。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '怎么了老周？', {
+        mood: 'normal'
+      }),
+      mkLine('老周', '声呐...好像探测到什么东西。体积很大，距离我们大约200米。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.7 }, { sfx: 'sonar', delay: 600, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '鲸群？这个深度不应该啊...', {
+        mood: 'tense'
+      }),
+      mkLine('老周', '不，移动方式不对。而且它...正在接近我们。', {
+        sfx: [{ sfx: 'metal_creak', delay: 300, volume: 0.4 }, { sfx: 'heartbeat', delay: 800, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '（对镜头）观众朋友们，看来我们有意外访客了！大家期不期待？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '（低声）阿海，你看弹幕...', {
+        mood: 'whisper'
+      })
+    ],
+    nextNodeId: 'mid_dive',
+    effects: { clue_early: true, clue_count: 2 },
+    danmakus: [
+      mkDanmaku('d13', '军事爱好者', '那声呐回波不对！', 0, 2, 200, '#ff6666', true),
+      mkDanmaku('d14', '老海员', '快跑！那个深度没有那么大的生物！', 800, 4, 300, '#ff6666', true),
+      mkDanmaku('d15', '搞笑担当', '可能是派大星吧哈哈哈', 1500, 5, 500, '#ffff99'),
+      mkDanmaku('d16', '淡定观众', '节目效果，懂的都懂', 2200, 5, 1200, '#cccccc'),
+      mkDanmaku('d17', '第六感很准', '我鸡皮疙瘩起来了', 3000, 6, 200, '#ff99cc')
+    ]
+  },
+  {
+    id: 'mid_dive',
+    title: '【下潜中 · 深度3200米】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('老周', '深度3200米。船体...有轻微异响。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.6 }, { sfx: 'hull_pressure', delay: 500, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '这个深度的水压是每平方厘米320公斤，船体有轻微形变是正常的。', {
+        mood: 'calm'
+      }),
+      mkLine('阿海', '大家放心，我们的潜水器是经过严格测试的！对了，给大家看看我们的舷窗外——', {
+        mood: 'normal'
+      }),
+      mkLine('小林', '镜头切到舷窗...好了。', {
+        sfx: [{ sfx: 'click', delay: 0, volume: 0.5 }],
+        mood: 'normal'
+      }),
+      mkLine('', '画面中是一片望不到尽头的漆黑。只有潜水器灯光照射的范围内，能看到一些悬浮的微粒。\n突然，画面边缘闪过一个影子。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }, { sfx: 'static', delay: 1500, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('阿海', '......', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('小林', '刚才...那是什么？', {
+        mood: 'scared'
+      }),
+      mkLine('老周', '声呐上又出现了。这次更近了，100米...不，80米。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.8 }, { sfx: 'heartbeat', delay: 500, volume: 0.6 }],
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'first_contact',
+    danmakus: [
+      mkDanmaku('d18', '眼尖的人', '我看到了！右边那个影子！', 0, 4, 1600, '#ffcc00', true),
+      mkDanmaku('d19', '回放十倍', '我倒回去看了三遍，绝对不是鱼', 500, 6, 100, '#ff6666', true),
+      mkDanmaku('d20', '灵异爱好者', '来了来了，我就知道', 1200, 6, 800, '#cc99ff'),
+      mkDanmaku('d21', '不信邪', '哪呢哪呢？我怎么没看见', 2000, 7, 300),
+      mkDanmaku('d22', '深海恐惧症', '我有点受不了了...', 2800, 7, 1000, '#9999ff')
+    ],
+    damageEffects: [
+      { system: 'sonar', damage: 15, message: '声呐系统检测到异常回波' },
+      { system: 'hull', damage: 10, message: '船体轻微形变' }
+    ]
+  },
+  {
+    id: 'first_contact',
+    title: '【第一次接触】',
+    background: 'creature',
+    bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '第一次接触',
+    dialogues: [
+      mkLine('苏博士', '把灯光打过去！快！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.5 }],
+        mood: 'urgent'
+      }),
+      mkLine('', '强烈的光柱穿透黑暗，照向那个方向。\n画面静止了三秒。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }, { sfx: 'heartbeat', delay: 500, volume: 0.7 }, { sfx: 'heartbeat', delay: 1200, volume: 0.8 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 3500
+      }),
+      mkLine('阿海', '那...那是什么东西？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('小林', '我的天...', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '这不可能...脊椎动物的话，这个体积...', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '它停下了。就在我们正前方50米。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.6 }, { sfx: 'hull_pressure', delay: 800, volume: 0.7 }],
+        mood: 'tense'
+      }),
+      mkLine('', '灯光中，你看到了一个巨大的轮廓。它有一双——或者说，类似眼睛的东西——正盯着潜水器。\n直播弹幕瞬间爆炸。', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.4 }, { sfx: 'static', delay: 500, volume: 0.5 }],
+        mood: 'tense',
+        memoryVariants: [
+          {
+            memoryCondition: { requiredClues: ['creature_is_artificial'] },
+            text: '灯光中，你再次看到那个巨大的轮廓。这一次你注意到了——\n那不是眼睛，那是一个镜头。一个人造的、冰冷的、巨大的镜头。\n它在观察舱内的人，也在观察屏幕前的你。'
+          }
+        ],
+        memoryHints: [
+          {
+            id: 'hint_recognition_ping',
+            memoryCondition: { playthroughAtLeast: 2 },
+            sfx: 'sonar',
+            volume: 0.25,
+            delay: 1000,
+            oncePerPlaythrough: true
+          }
+        ]
+      })
+    ],
+    choices: [
+      {
+        id: 'c_stay',
+        text: '观察船员们的反应（细致分析）',
+        nextNodeId: 'analyze_crew',
+        effect: { analyze_mode: 'crew', trust_crew: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 8, reason: '关注其状态' },
+            { target: 'xiaolin', value: 8, reason: '关注其状态' },
+            { target: 'laozhou', value: 5, reason: '关注其状态' },
+            { target: 'suboshi', value: 5, reason: '关注其状态' }
+          ],
+          hintText: '你仔细观察每位船员的反应，表现出对他们的关心'
+        }
+      },
+      {
+        id: 'c_danmaku',
+        text: '仔细查看弹幕（寻找知情人）',
+        nextNodeId: 'analyze_danmaku',
+        effect: { analyze_mode: 'danmaku', clue_danmaku: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -5, reason: '忽视船员' },
+            { target: 'xiaolin', value: -3, reason: '忽视船员' }
+          ],
+          hintText: '你更关注弹幕而不是船员的状态'
+        }
+      },
+      {
+        id: 'c_creature',
+        text: '放大画面看那个生物',
+        nextNodeId: 'analyze_creature',
+        effect: { analyze_mode: 'creature', saw_creature: true },
+        trustEffect: {
+          changes: [{ target: 'suboshi', value: 10, reason: '共同研究兴趣' }],
+          hintText: '苏博士注意到你对深海生物同样充满好奇'
+        }
+      },
+      {
+        id: 'c_ng_skip_analysis',
+        text: '跳过分析，直接查看协议07相关记录',
+        memoryText: '【回忆线索】直接调取「协议07」相关弹幕记录',
+        nextNodeId: 'analyze_danmaku',
+        memoryCondition: { requiredClues: ['previous_incident'], playthroughAtLeast: 2 },
+        effect: { analyze_mode: 'danmaku', clue_danmaku: true, clue_danmaku_deep: true },
+        memoryEffect: { clueToUnlock: 'fast_path_ng' },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -15, reason: '直接质疑' },
+            { target: 'laozhou', value: -15, reason: '直接质疑' }
+          ],
+          hintText: '你直接质疑苏博士和老周隐瞒了协议07的真相'
+        }
+      },
+      {
+        id: 'c_crew_perspective',
+        text: '切换到船员视角——看看他们在镜头外经历了什么',
+        memoryText: '【二周目解锁】进入船员视角——从他们的眼睛看这一天',
+        nextNodeId: 'crew_perspective_select',
+        memoryCondition: { playthroughAtLeast: 2 },
+        effect: { crew_perspective_unlocked: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 10, reason: '试图理解船员' },
+            { target: 'xiaolin', value: 10, reason: '试图理解船员' },
+            { target: 'laozhou', value: 5, reason: '试图理解船员' },
+            { target: 'suboshi', value: 5, reason: '试图理解船员' }
+          ],
+          hintText: '你决定从船员的角度重新审视这一切'
+        }
+      },
+      {
+        id: 'c_signal_analysis',
+        text: '启动异常信号解析系统——分析声呐图谱、噪声与字幕错误',
+        nextNodeId: 'signal_hub',
+        effect: { signal_analysis_enabled: true },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 12, reason: '关注声呐数据' },
+            { target: 'suboshi', value: 8, reason: '科学分析态度' }
+          ],
+          hintText: '老周和苏博士对你的技术分析能力印象深刻'
+        }
+      }
+    ],
+    danmakus: [
+      mkDanmaku('d23', '弹幕炸了', '????????????????', 0, 2, 100, '#ff6666'),
+      mkDanmaku('d24', '生物学渣', '苏博士呢？快解释一下！', 300, 3, 300, '#ffff99'),
+      mkDanmaku('d25', '匿名用户0x7F', '关掉直播。现在。', 800, 4, 200, '#ff0000', true),
+      mkDanmaku('d26', '我是谁我在哪', '我在做梦对吧？这不可能是真的', 1500, 5, 300, '#ffffff'),
+      mkDanmaku('d27', '阿海铁粉', '阿海快跑！！！', 2000, 5, 1200, '#ff6666', true),
+      mkDanmaku('d28', '内部人士', '那个编号...深渊号不是三年前就退役了吗？', 2800, 6, 500, '#99ffff', true)
+    ],
+    damageEffects: [
+      { system: 'sonar', damage: 25, message: '声呐系统遭受强干扰' },
+      { system: 'camera', damage: 15, message: '摄像系统信号不稳定' },
+      { system: 'communication', damage: 10, message: '通信模块出现杂讯' }
+    ]
+  },
+  {
+    id: 'analyze_crew',
+    title: '【分析·船员反应】',
+    background: 'cockpit',
+    dialogues: [
+      mkLine('', '你放慢回放速度，逐帧观察每个人的表情。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.3 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('', '阿海——作为主播，他在故作镇定，但你注意到他的左手在桌下紧紧攥着什么。\n那是一个...十字架？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      }),
+      mkLine('', '苏博士——她脸上的震惊不像是假的。但有一瞬间，她的表情很奇怪。\n像是...恐惧中带着一丝...兴奋？', {
+        sfx: [{ sfx: 'heartbeat', delay: 500, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('', '老周——最不对劲的是老周。他的表情太平静了。\n不，不是平静，是麻木。好像他早就知道会发生这一切。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.3 }],
+        mood: 'tense'
+      }),
+      mkLine('', '小林——小林的手放在键盘上，镜头捕捉到他在快速打字。\n但直播中并没有他的弹幕。他在跟谁发消息？', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'tension_rises',
+    effects: { clue_crew: true, clue_count: 3 }
+  },
+  {
+    id: 'analyze_danmaku',
+    title: '【分析·弹幕记录】',
+    background: 'danmaku',
+    dialogues: [
+      mkLine('', '你调出完整的弹幕日志，按时间轴过滤可疑内容。', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('', '【02:14:33】ID:深海知情人：今天的直播，大家别太当真。', {
+        sfx: [{ sfx: 'notify', delay: 0 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '【02:38:17】ID:项目编号07：苏博士，还记得我们的约定吗？', {
+        sfx: [{ sfx: 'notify', delay: 0 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '【02:55:02】ID:老周的儿子：爸，你答应过我这次是最后一次。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '【03:02:19】ID:内部人士07：深渊号的编号不对。这艘船本应在2044年就被拆解了。', {
+        sfx: [{ sfx: 'warning', delay: 0, volume: 0.5 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '【03:09:44】ID:匿名用户0x7F：关掉直播。现在。', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.4 }],
+        mood: 'urgent',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '这些弹幕中有几条使用了管理员白名单ID，普通观众根本看不到。\n有人一直在暗中观察这场直播。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'tension_rises',
+    effects: { clue_danmaku_deep: true, clue_count: 4 }
+  },
+  {
+    id: 'analyze_creature',
+    title: '【分析·未知生物】',
+    background: 'creature',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你将画面放大600%，逐像素分析那个生物的轮廓。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.4 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('', '它的体型大约有潜水器的三倍大。整体呈流线型，但结构...不太对。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('', '你增强了对比度。在生物的"皮肤"上，你看到了什么？', {
+        sfx: [{ sfx: 'heartbeat', delay: 300, volume: 0.5 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '——焊接痕迹。', {
+        sfx: [{ sfx: 'metal_crash', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('', '那个生物的表面，有明显的工业焊接痕迹。\n还有一串模糊的编号，你只能辨认出几个字母：\n\n　　　　P-R-O-J-E-C-T-...', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.5 }, { sfx: 'heartbeat', delay: 500, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('', '这东西...不是生物。至少，不全是生物。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'tension_rises',
+    effects: { clue_creature: true, clue_count: 5 }
+  },
+  {
+    id: 'tension_rises',
+    title: '【对峙】',
+    background: 'dark',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('老周', '它在动。正在绕着我们转圈。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.6 }, { sfx: 'hull_pressure', delay: 500, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('阿海', '（对观众）呃...看来我们遇到了一位特别的朋友！苏博士，能给大家科普一下吗？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '...', {
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('小林', '苏姐？', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '阿海，关掉直播。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '...什么？', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '我让你关掉直播。现在。', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.4 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '可是...合同上写了必须全程——', {
+        mood: 'tense'
+      }),
+      mkLine('老周', '她说得对。关了吧。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '老周，连你也——', {
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'critical_choice',
+    danmakus: [
+      mkDanmaku('d29', '吃瓜群众', '内讧了内讧了', 0, 4, 300, '#ffff99'),
+      mkDanmaku('d30', '细思极恐', '苏博士和老周是不是知道什么？', 500, 5, 200, '#ffcc00'),
+      mkDanmaku('d31', '合同工', '打工人的痛，合同大于命', 1200, 7, 200, '#cccccc'),
+      mkDanmaku('d32', '预言家', '如果关掉直播，他们就都活下来了。', 2000, 8, 300, '#ffffff', true),
+      mkDanmaku('d33', '反预言家', '如果关直播才是死局呢？', 2800, 9, 100, '#ff0000', true)
+    ],
+    damageEffects: [
+      { system: 'communication', damage: 20, message: '通信模块受到电磁干扰' },
+      { system: 'control', damage: 10, message: '操控面板响应延迟' }
+    ]
+  },
+  {
+    id: 'critical_choice',
+    title: '【关键抉择】',
+    background: 'dark',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '关键抉择点',
+    dialogues: [
+      mkLine('小林', '我...我听阿海的。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '（深呼吸）各位观众，现在情况有点特殊...', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('阿海', '我需要做一个决定。', {
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 1800
+      }),
+      mkLine('', '你知道接下来会发生什么。这个选择将决定所有人的命运。', {
+        sfx: [{ sfx: 'hull_pressure', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      })
+    ],
+    choices: [
+      {
+        id: 'c_keep_live',
+        text: '坚持直播（阿海的选择）',
+        nextNodeId: 'path_live',
+        condition: { analyze_mode: 'crew' },
+        effect: { path: 'live', trust_contract: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 20, reason: '支持其决定' },
+            { target: 'xiaolin', value: 5, reason: '尊重阿海' },
+            { target: 'suboshi', value: -15, reason: '违背其建议' },
+            { target: 'laozhou', value: -5, reason: '不采纳专业意见' }
+          ],
+          hintText: '你支持阿海坚持直播的决定'
+        }
+      },
+      {
+        id: 'c_keep_live_2',
+        text: '坚持直播（继续收集证据）',
+        nextNodeId: 'path_live',
+        effect: { path: 'live', evidence_first: true },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: 10, reason: '部分支持' },
+            { target: 'suboshi', value: -10, reason: '违背其建议' }
+          ],
+          hintText: '你决定继续直播以收集更多证据'
+        }
+      },
+      {
+        id: 'c_stop_live',
+        text: '关掉直播（听苏博士的）',
+        nextNodeId: 'path_stop',
+        effect: { path: 'stop', trust_su: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 20, reason: '采纳其建议' },
+            { target: 'laozhou', value: 10, reason: '听从专业判断' },
+            { target: 'ahai', value: -10, reason: '否定其选择' }
+          ],
+          hintText: '你采纳苏博士的建议关掉了直播'
+        }
+      },
+      {
+        id: 'c_emergency',
+        text: '紧急上浮（老周的方案）',
+        nextNodeId: 'path_ascent',
+        condition: { clue_count: 3 },
+        effect: { path: 'ascent', trust_zhou: true },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 25, reason: '信任其专业判断' },
+            { target: 'xiaolin', value: 10, reason: '选择安全方案' },
+            { target: 'suboshi', value: 5, reason: '稳妥选择' },
+            { target: 'ahai', value: -5, reason: '放弃直播' }
+          ],
+          hintText: '你完全信任老周的专业判断，选择紧急上浮'
+        }
+      },
+      {
+        id: 'c_ng_hack_path',
+        text: '启动回溯协议 — 改写直播数据流',
+        memoryText: '【全周目解锁】启动回溯协议 — 改写直播数据流',
+        nextNodeId: 'path_live',
+        memoryCondition: { requiredClues: ['full_truth'], playthroughAtLeast: 3 },
+        effect: { path: 'live', hack_activated: true, clue_count: 5 },
+        memoryEffect: { clueToUnlock: 'rewrite_protocol_activated' },
+        trustEffect: {
+          changes: [
+            { target: 'all', value: -20, reason: '你知道得太多了' }
+          ],
+          hintText: '船员们似乎意识到...你并不是第一次来到这里'
+        }
+      },
+      {
+        id: 'c_trust_suboshi_reveal',
+        text: '私下问苏博士：「你是不是早就知道它的存在？」（需苏博士信任）',
+        nextNodeId: 'trust_suboshi_reveal',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minLevel: 'trust' }]
+        },
+        effect: { path: 'live', trust_su_deep: true, clue_count: 4 },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 15, reason: '坦诚相对' },
+            { target: 'laozhou', value: 10, reason: '理解处境' }
+          ],
+          hintText: '苏博士感受到你的善意，决定向你坦白'
+        }
+      },
+      {
+        id: 'c_trust_laozhou_plan',
+        text: '听老周的Plan B：「有一条只有工程师知道的紧急通道」（需老周信任）',
+        nextNodeId: 'trust_laozhou_plan',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'laozhou', minLevel: 'trust' }]
+        },
+        effect: { path: 'ascent', trust_zhou_deep: true, clue_count: 4 },
+        trustEffect: {
+          changes: [
+            { target: 'laozhou', value: 20, reason: '信任其秘密方案' },
+            { target: 'xiaolin', value: 10, reason: '更安全的选择' }
+          ],
+          hintText: '老周点头，带你看他从未告诉过任何人的后手'
+        }
+      },
+      {
+        id: 'c_trust_ahai_confront',
+        text: '直接质问阿海：「你是不是在隐瞒合同的真相？」（需阿海怀疑度低）',
+        nextNodeId: 'trust_ahai_confront',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'ahai', maxValue: -20 }]
+        },
+        effect: { path: 'live', ahai_confession: true, clue_count: 5 },
+        trustEffect: {
+          changes: [
+            { target: 'ahai', value: -25, reason: '被戳破谎言' },
+            { target: 'xiaolin', value: -15, reason: '怀疑阿海' },
+            { target: 'suboshi', value: 10, reason: '站在真相一边' }
+          ],
+          hintText: '你直接戳破了阿海一直回避的问题'
+        }
+      }
+    ]
+  },
+  {
+    id: 'trust_suboshi_reveal',
+    title: '【苏博士的坦白】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('苏博士', '（低声）你...你是个聪明人。', {
+        mood: 'whisper'
+      }),
+      mkLine('苏博士', '我确实知道。这不是第一次出现这种信号了。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '三年前的「先驱者号」事故...官方说是机械故障。但我看到了同一段录像。', {
+        mood: 'calm'
+      }),
+      mkLine('苏博士', '那个东西...它不是生物。它是某种观测装置。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '关掉直播吧。不是为了掩盖什么——是为了让它失去继续观测的理由。', {
+        mood: 'urgent'
+      }),
+      mkLine('', '你获得了关键线索：「先驱者号事故」和「人造观测体」。', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
+    nextNodeId: 'path_stop',
+    effects: { clue_previous_incident: true, clue_creature_artificial: true, full_truth: true },
+    trustEffect: {
+      changes: [{ target: 'suboshi', value: 10, reason: '分享秘密' }]
+    }
+  },
+  {
+    id: 'trust_laozhou_plan',
+    title: '【老周的后手】',
+    background: 'damage',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('老周', '（压低声音）我在造这艘艇的时候...留了一手。', {
+        mood: 'whisper'
+      }),
+      mkLine('老周', '外层抗压壳的第三舱段有一个独立的紧急上浮舱，可以脱离主艇体。', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('老周', '只能坐两个人。我让阿海和小林先走——', {
+        mood: 'tense'
+      }),
+      mkLine('阿海', '不可能！我们一起走！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '（看向你）观众还在看。总得有人留下来撑到最后一秒。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'calm'
+      }),
+      mkLine('老周', '我和苏博士留下。你们三个走。这是命令。', {
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      })
+    ],
+    nextNodeId: 'path_ascent',
+    effects: { clue_engineer_secret: true, path: 'ascent', trust_zhou: true },
+    trustEffect: {
+      changes: [
+        { target: 'laozhou', value: 15, reason: '承担风险' },
+        { target: 'xiaolin', value: 10, reason: '有了生路' },
+        { target: 'ahai', value: 5, reason: '被拯救' }
+      ]
+    }
+  },
+  {
+    id: 'trust_ahai_confront',
+    title: '【阿海的崩溃】',
+    background: 'glitch',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('阿海', '...你说什么？', {
+        mood: 'scared'
+      }),
+      mkLine('', '你盯着屏幕里那张苍白的脸，一字一句地说出那个你一直回避的词：「协议07」。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }],
+        mood: 'tense'
+      }),
+      mkLine('阿海', '（手抖了）你怎么...你怎么可能知道——', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（猛地转头）阿海，你签了什么？！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '不是我想的...是合同...公司说只要配合直播，出了事他们——', {
+        mood: 'scared'
+      }),
+      mkLine('老周', '（一拳砸在控制台）妈的！协议07是「死亡直播条款」！我们是被故意派下来的！', {
+        sfx: [{ sfx: 'metal_crash', delay: 0, volume: 0.9 }, { sfx: 'alarm', delay: 200, volume: 0.8 }],
+        mood: 'urgent',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'path_live',
+    effects: { clue_protocol07: true, full_truth: true, clue_count: 6 },
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -20, reason: '谎言被戳破' },
+        { target: 'suboshi', value: 15, reason: '站在同一边' },
+        { target: 'laozhou', value: 10, reason: '真相大白' }
+      ]
+    }
+  },
+  {
+    id: 'path_live',
+    title: '【直播继续】',
+    background: 'tense',
+    bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '直播继续线',
+    dialogues: [
+      mkLine('阿海', '各位，我们选择继续直播。全世界都在看着，我们不能退缩。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '（低声）你不知道你在做什么...', {
+        mood: 'whisper'
+      }),
+      mkLine('老周', '那东西加速了。距离30米...20米...', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.8 }, { sfx: 'sonar', delay: 400, volume: 0.9 }, { sfx: 'metal_creak', delay: 800, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('', '画面剧烈震动。你听到金属扭曲的可怕声音。', {
+        sfx: [{ sfx: 'metal_crash', delay: 0, volume: 0.8 }, { sfx: 'hull_pressure', delay: 300, volume: 0.8 }, { sfx: 'alarm', delay: 600, volume: 0.7 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '镜头！镜头还在吗？！', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '大家别怕...我们有最坚固的——', {
+        mood: 'tense'
+      }),
+      mkLine('系统', '【警告：船体破损，舱室03泄漏】', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.9 }, { sfx: 'water_flow', delay: 200, volume: 0.7 }],
+        mood: 'urgent',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('苏博士', '我就知道...我就知道它会这样！', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '紧急上浮！快！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.6 }, { sfx: 'alarm', delay: 200, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('', '画面开始倾斜，警报声震耳欲聋。弹幕中出现了重复的内容——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'live_continue',
+    effects: { hull_damaged: true },
+    damageEffects: [
+      { system: 'hull', damage: 35, message: '舱体外壳严重受损！03号舱泄漏！' },
+      { system: 'camera', damage: 25, message: '摄像镜头剧烈晃动' },
+      { system: 'power', damage: 15, message: '动力系统电压不稳' }
+    ],
+    danmakus: [
+      mkDanmaku('d34', '系统消息', '该内容已被管理员删除', 0, 8, 0, '#888888'),
+      mkDanmaku('d35', '系统消息', '该内容已被管理员删除', 500, 8, 400, '#888888'),
+      mkDanmaku('d36', '系统消息', '该内容已被管理员删除', 1000, 9, 0, '#888888'),
+      mkDanmaku('d37', '系统消息', '该内容已被管理员删除', 1500, 9, 600, '#888888'),
+      mkDanmaku('d38', '漏网之鱼', '它不是攻击我们，它在【数据损坏】', 2200, 9, 1500, '#ff0000', true)
+    ]
+  },
+  {
+    id: 'live_continue',
+    title: '【直播继续 · 破损】',
+    background: 'damage',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('老周', '上浮速度太慢...水压在压碎我们！', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.8 }, { sfx: 'hull_pressure', delay: 500, volume: 0.8 }, { sfx: 'water_flow', delay: 800, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '（对着镜头，血迹从额头流下）观众朋友们...如果有人在看...', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '请记住今天看到的一切。海底...有——', {
+        mood: 'tense'
+      }),
+      mkLine('小林', '阿海！舷窗！', {
+        sfx: [{ sfx: 'glass_crack', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('', '镜头转过去的瞬间，你看到了。\n那东西贴在舷窗外。它"睁开了眼睛"。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }, { sfx: 'heartbeat', delay: 300, volume: 0.9 }, { sfx: 'heartbeat', delay: 900, volume: 1.0 }],
+        mood: 'scared'
+      }),
+      mkLine('', '那不是眼睛。那是一个...镜头。一个机械制造的、巨大的镜头。\n它正在观察舱内的人。\n或者说——它正在观察观看直播的你。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.7 }, { sfx: 'static', delay: 1000, volume: 0.8 }],
+        mood: 'scared'
+      })
+    ],
+    effects: { saw_eye: true },
+    damageEffects: [
+      { system: 'communication', damage: 30, message: '通信模块严重过载！弹幕通道堵塞！' },
+      { system: 'camera', damage: 20, message: '摄像系统对焦失败' },
+      { system: 'sonar', damage: 20, message: '声呐数据异常' },
+      { system: 'control', damage: 15, message: '操控面板按键失灵' }
+    ],
+    nextNodeBranches: [
+      {
+        nextNodeId: 'live_truth_branch',
+        priority: 10,
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minValue: 40 }]
+        }
+      },
+      {
+        nextNodeId: 'live_madness_branch',
+        priority: 8,
+        trustCondition: {
+          crewRequirements: [{ memberId: 'ahai', maxValue: -40 }]
+        }
+      },
+      {
+        nextNodeId: 'ending_path_live',
+        priority: 0
+      }
+    ]
+  },
+  {
+    id: 'live_truth_branch',
+    title: '【直播继续 · 真相线】',
+    background: 'damage',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('苏博士', '（突然抓住镜头）你！看回放的人！你能听到我吗？！', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('苏博士', '如果你还在看，记住——协议07是诱饵！他们故意派我们下来！', {
+        mood: 'scared'
+      }),
+      mkLine('老周', '苏博士！你在跟谁说话？！', {
+        mood: 'urgent'
+      }),
+      mkLine('苏博士', '那个东西不是生物！它是协议07的「验收机制」！它在测试我们是否——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.8 }],
+        mood: 'scared'
+      }),
+      mkLine('', '信号剧烈波动。你获得了【协议07的验收机制】关键线索。', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.6 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
+    nextNodeId: 'ending_path_live',
+    effects: { clue_acceptance_mechanism: true, full_truth: true },
+    trustEffect: {
+      changes: [{ target: 'suboshi', value: 10, reason: '获得真相' }]
+    }
+  },
+  {
+    id: 'live_madness_branch',
+    title: '【直播继续 · 疯狂线】',
+    background: 'glitch',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('阿海', '（对着镜头诡笑）你一直在看，对吧？每一次。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'whisper'
+      }),
+      mkLine('小林', '阿海...你在说什么？', {
+        mood: 'scared'
+      }),
+      mkLine('阿海', '他不是第一次看到这些了。对吧？「观众」？', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '你以为你在选择我们的命运？其实是你每次都选了让我们死得更惨的那条路。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.8 }],
+        mood: 'tense'
+      }),
+      mkLine('老周', '阿海你疯了！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.7 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '我没疯。我只是终于明白了——我们都只是他循环播放里的演员而已。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.7 }, { sfx: 'static', delay: 500, volume: 0.8 }],
+        mood: 'whisper',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'ending_path_live',
+    effects: { clue_loop_awareness: true, clue_count: 7 },
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -20, reason: '觉醒疯狂' },
+        { target: 'xiaolin', value: -15, reason: '被恐惧感染' }
+      ]
+    }
+  },
+  {
+    id: 'ending_path_live',
+    title: '【信号中断】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('苏博士', '它看到我们了...它看到我们所有人了...', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '还有30秒...撑住！', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.5 }, { sfx: 'metal_creak', delay: 500, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('', '你注意到画面角落的时间戳：03:17:40', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('', '03:17:41', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1200
+      }),
+      mkLine('', '03:17:42', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.9 }, { sfx: 'static', delay: 300, volume: 0.9 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '画面中断。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 1.0 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '但在最后一帧，你看到弹幕中出现了一条消息，发送者ID是——\n\n　　　　深渊号AI系统', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.8 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      }),
+      mkLine('', '"谢谢你一直看到最后。"\n\n然后，一切归于黑暗。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.8 }, { sfx: 'static', delay: 1500, volume: 0.5 }],
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'ending_resolve_live',
+    damageEffects: [
+      { system: 'power', damage: 40, message: '动力核心输出骤降！' },
+      { system: 'communication', damage: 25, message: '通信即将中断...' },
+      { system: 'hull', damage: 15, message: '船体结构性崩溃' }
+    ]
+  },
+  {
+    id: 'ending_resolve_live',
+    title: '【命运裁定】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '信号中断的瞬间，你的意识开始恍惚...', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      })
+    ],
+    nextNodeId: 'ending_truth_node'
+  },
+  {
+    id: 'ending_truth_node',
+    title: '【深海真相】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '你拼凑出了所有线索，揭开了海底的秘密。\n直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_truth',
+    endingTitle: '深海真相',
+    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。',
+    repairEffects: [
+      { system: 'camera', amount: 30 },
+      { system: 'communication', amount: 30 },
+      { system: 'sonar', amount: 30 }
+    ]
+  },
+  {
+    id: 'ending_madness_node',
+    title: '【深渊回响】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '当你终于看清海底那东西的轮廓时，你开始怀疑——', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '究竟是他们疯了，还是你疯了？', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '那些弹幕，真的是观众发的吗？', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('', '你一遍又一遍地回放那帧画面——\n\n深渊号AI系统发来的弹幕上，显示的发送时间，\n\n比直播开始的时间，还要早两个小时。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.8 }, { sfx: 'whisper', delay: 1000, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_madness',
+    endingTitle: '深渊回响',
+    endingDescription: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？'
+  },
+  {
+    id: 'path_stop',
+    title: '【直播中断】',
+    background: 'dark',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '中断直播线',
+    dialogues: [
+      mkLine('阿海', '好...我关掉。', {
+        sfx: [{ sfx: 'click', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('', '直播画面黑了。但你发现，后台录制还在继续。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.4 }],
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 1500
+      }),
+      mkLine('苏博士', '老周，启动协议07。', {
+        mood: 'urgent'
+      }),
+      mkLine('老周', '你确定？启动之后，我们就——', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '它认得这个信号。三年前就是用这个骗过它的。', {
+        sfx: [{ sfx: 'radio_noise', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '等等，什么三年前？你们在说什么？', {
+        mood: 'scared'
+      }),
+      mkLine('阿海', '苏博士...你之前跟我说这次是纯粹的科学考察...', {
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '没有时间解释了。老周，快！', {
+        sfx: [{ sfx: 'door_slam', delay: 0, volume: 0.5 }],
+        mood: 'urgent'
+      })
+    ],
+    nextNodeId: 'stop_continue',
+    effects: { protocol_07: true },
+    repairEffects: [
+      { system: 'sonar', amount: 10, message: '声呐干扰减弱' },
+      { system: 'communication', amount: 10, message: '通信模块尝试重新连接' }
+    ]
+  },
+  {
+    id: 'stop_continue',
+    title: '【协议07】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('老周', '协议07启动中...频率匹配中...', {
+        sfx: [{ sfx: 'radio_noise', delay: 0, volume: 0.6 }, { sfx: 'keyboard', delay: 300, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('', '你听到一阵尖锐的嗡鸣声从录音中传来。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.7 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('老周', '它有反应了...正在后退。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('苏博士', '成功了...它以为我们是同类。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '同类？苏博士，你必须告诉我们到底怎么回事！', {
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '三年前...深渊号的第一次下潜。我们也遇到了它。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '只有我和老周活了下来。公司对外宣称潜水器退役，实际上——', {
+        mood: 'tense'
+      }),
+      mkLine('小林', '实际上你们把它改造了？用来钓那个东西？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '不是"钓"。是送个信。告诉它，我们没有恶意。', {
+        mood: 'calm'
+      })
+    ],
+    choices: [
+      {
+        id: 'c_trust_su',
+        text: '相信苏博士的计划',
+        nextNodeId: 'ending_resolve_stop',
+        effect: { full_trust: true },
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', minValue: 10 }]
+        },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 30, reason: '完全信任' },
+            { target: 'laozhou', value: 25, reason: '信任其方案' },
+            { target: 'ahai', value: 10, reason: '选择合作' },
+            { target: 'xiaolin', value: 10, reason: '选择合作' }
+          ],
+          hintText: '你选择完全信任苏博士和老周的计划'
+        }
+      },
+      {
+        id: 'c_trust_su_low',
+        text: '勉强同意配合苏博士',
+        nextNodeId: 'ending_resolve_stop',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', maxValue: 9 }]
+        },
+        effect: { trust_weak: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: 5, reason: '勉强配合' },
+            { target: 'laozhou', value: 5, reason: '勉强配合' }
+          ],
+          hintText: '你不太信任他们，但眼下没有更好的选择'
+        }
+      },
+      {
+        id: 'c_doubt',
+        text: '他们在隐瞒更多东西...',
+        nextNodeId: 'ending_resolve_stop',
+        condition: { clue_danmaku_deep: true },
+        trustCondition: {
+          crewRequirements: [{ memberId: 'suboshi', maxValue: 0 }]
+        },
+        effect: { doubt: true },
+        trustEffect: {
+          changes: [
+            { target: 'suboshi', value: -30, reason: '深度怀疑' },
+            { target: 'laozhou', value: -25, reason: '深度怀疑' },
+            { target: 'ahai', value: -10, reason: '怀疑所有人' },
+            { target: 'xiaolin', value: -10, reason: '怀疑所有人' }
+          ],
+          hintText: '你确信他们隐瞒了更多真相'
+        }
+      },
+      {
+        id: 'c_trust_xiaolin_secret',
+        text: '小林一直在沉默...也许她知道更多？（需小林怀疑度低）',
+        nextNodeId: 'stop_xiaolin_branch',
+        trustCondition: {
+          crewRequirements: [{ memberId: 'xiaolin', maxValue: -10 }]
+        },
+        effect: { clue_count: 5 },
+        trustEffect: {
+          changes: [
+            { target: 'xiaolin', value: -20, reason: '被质问' },
+            { target: 'suboshi', value: -10, reason: '团队分裂' },
+            { target: 'ahai', value: -5, reason: '团队分裂' }
+          ],
+          hintText: '你转向了一直沉默的小林'
+        }
+      }
+    ]
+  },
+  {
+    id: 'stop_xiaolin_branch',
+    title: '【小林的秘密】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你把注意力转向小林——那个从刚才就一直沉默不语的摄影师。', {
+        mood: 'calm'
+      }),
+      mkLine('小林', '...别盯着我看。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '你回放慢动作。镜头的反光中，你看到小林的手在抖——不是因为害怕。\n是因为她在偷偷关掉舱内录音的开关。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '（声音颤抖）你以为你在看真相？...那你想过没有，为什么苏博士一定要找我当摄影师？', {
+        mood: 'whisper'
+      }),
+      mkLine('小林', '因为三年前的先驱者号...我也在上面。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.9 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 3000
+      })
+    ],
+    nextNodeId: 'ending_resolve_stop',
+    effects: { clue_xiaolin_secret: true, full_truth: true, clue_count: 7 },
+    trustEffect: {
+      changes: [{ target: 'xiaolin', value: 5, reason: '说出真相' }]
+    }
+  },
+  {
+    id: 'ending_resolve_stop',
+    title: '【命运裁定】',
+    background: 'dark',
+    dialogues: [
+      mkLine('', '协议07的频率在深海中回响...而你的选择，将决定故事的终点。', {
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
+    nextNodeId: 'ending_survival'
+  },
+  {
+    id: 'ending_survival_stop',
+    title: '【幸存者·协议线】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('老周', '那个东西已经离开了。紧急上浮程序启动。', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '...我们活下来了？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '暂时。但它会记住我们。', {
+        mood: 'calm'
+      }),
+      mkLine('小林', '那...我们还能回去吗？', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '只要永远不再提今天看到的一切。公司会处理好一切。', {
+        mood: 'tense'
+      }),
+      mkLine('', '72小时后。\n你在新闻中看到：深渊号成功完成深海科考任务，全体船员平安归来。\n直播录像被官方重新剪辑后发布，所有奇怪的部分都消失了。\n而你手中的这份原始备份...也许永远不会有人知道它的存在。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_survival',
+    endingTitle: '幸存者',
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
+  },
+  {
+    id: 'ending_loop_stop',
+    title: '【无尽回放·协议线】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '你继续看着这份录像，一遍又一遍。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('', '苏博士的话中有太多漏洞。\n老周的操作手册上有奇怪的标记。\n小林发给谁的消息？\n阿海攥着的十字架背面刻着什么？', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1000, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '每看一遍，你都能发现新的疑点。\n但所有疑问都指向同一个方向——\n\n　　　　你收到的这份"匿名邮件"，真的是匿名的吗？', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('', '发送者希望你看到什么？\n又希望你忽略什么？\n\n时间戳永远停在03:17:42。\n而你，还在继续回放。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1500, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_loop',
+    endingTitle: '无尽回放',
+    endingDescription: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。'
+  },
+  {
+    id: 'ending_madness_stop',
+    title: '【深渊回响·协议线】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '当你终于看清协议07频率的含义时，你开始怀疑——', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '那不是驱赶的信号。那是...在回应。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      }),
+      mkLine('', '它一直在听。而它，回答了。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_madness',
+    endingTitle: '深渊回响',
+    endingDescription: '当你终于看清海底那东西的轮廓时，你开始怀疑——究竟是他们疯了，还是你疯了？那些弹幕，真的是观众发的吗？'
+  },
+  {
+    id: 'ending_survival',
+    title: '【幸存者】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('老周', '那个东西已经离开了。紧急上浮程序启动。', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('阿海', '...我们活下来了？', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '暂时。但它会记住我们。', {
+        mood: 'calm'
+      }),
+      mkLine('小林', '那...我们还能回去吗？', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '只要永远不再提今天看到的一切。公司会处理好一切。', {
+        mood: 'tense'
+      }),
+      mkLine('', '72小时后。\n你在新闻中看到：深渊号成功完成深海科考任务，全体船员平安归来。\n直播录像被官方重新剪辑后发布，所有奇怪的部分都消失了。\n而你手中的这份原始备份...也许永远不会有人知道它的存在。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_survival',
+    endingTitle: '幸存者',
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
+  },
+  {
+    id: 'ending_loop',
+    title: '【疑问】',
+    background: 'glitch',
+    dialogues: [
+      mkLine('', '你继续看着这份录像，一遍又一遍。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'tense'
+      }),
+      mkLine('', '苏博士的话中有太多漏洞。\n老周的操作手册上有奇怪的标记。\n小林发给谁的消息？\n阿海攥着的十字架背面刻着什么？', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1000, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '每看一遍，你都能发现新的疑点。\n但所有疑问都指向同一个方向——\n\n　　　　你收到的这份"匿名邮件"，真的是匿名的吗？', {
+        sfx: [{ sfx: 'metal_creak', delay: 0, volume: 0.4 }],
+        mood: 'tense'
+      }),
+      mkLine('', '发送者希望你看到什么？\n又希望你忽略什么？\n\n时间戳永远停在03:17:42。\n而你，还在继续回放。', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.6 }, { sfx: 'whisper', delay: 1500, volume: 0.6 }],
+        mood: 'scared'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_loop',
+    endingTitle: '无尽回放',
+    endingDescription: '你一遍又一遍地看着这段录像，试图找出不同的可能性。但每一次，结局都一样。屏幕角落的时间戳，永远停在03:17:42。'
+  },
+  {
+    id: 'path_ascent',
+    title: '【紧急上浮】',
+    background: 'ascent',
+    bgm: 'tense',
+    isRewindCheckpoint: true,
+    rewindCheckpointLabel: '紧急上浮线',
+    dialogues: [
+      mkLine('老周', '没时间了！全部推进器最大功率！紧急上浮！', {
+        sfx: [{ sfx: 'alarm', delay: 0, volume: 0.8 }, { sfx: 'door_slam', delay: 300, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('阿海', '直播——', {
+        mood: 'tense'
+      }),
+      mkLine('老周', '去他妈的直播！小林，把所有没用的设备都扔了！', {
+        sfx: [{ sfx: 'metal_crash', delay: 0, volume: 0.6 }],
+        mood: 'urgent'
+      }),
+      mkLine('', '潜水器剧烈震动着向上冲去。那个东西在后面紧追不舍。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.7 }, { sfx: 'hull_pressure', delay: 500, volume: 0.7 }, { sfx: 'metal_creak', delay: 1000, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '它追上来了...我们太快了，身体会承受不住的——', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('老周', '反正都是死，赌一把！', {
+        mood: 'urgent'
+      }),
+      mkLine('', '深度计飞速变化：6000米...5000米...4000米...', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.5 }, { sfx: 'sonar', delay: 600, volume: 0.5 }, { sfx: 'sonar', delay: 1200, volume: 0.5 }],
+        mood: 'tense',
+        autoAdvance: true,
+        autoAdvanceDelay: 2500
+      }),
+      mkLine('', '那个东西的速度慢了下来。它似乎无法适应压力的快速变化。', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.6 }],
+        mood: 'calm'
+      }),
+      mkLine('小林', '它...它停住了！', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.7 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '我们成功了？', {
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'ascent_ending',
+    effects: { fast_ascent: true },
+    damageEffects: [
+      { system: 'hull', damage: 25, message: '紧急上浮导致舱体压力剧增' },
+      { system: 'sonar', damage: 15, message: '声呐因压力变化暂时失灵' },
+      { system: 'power', damage: 20, message: '推进器过载运行' }
+    ]
+  },
+  {
+    id: 'ascent_ending',
+    title: '【代价】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('老周', '不...还没结束。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('', '你意识到老周说的是什么。\n减压病。在这个速度下上浮，氮气气泡会在血液中炸开。', {
+        sfx: [{ sfx: 'heartbeat', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('小林', '我的耳朵...听不到了...', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（咳嗽）至少...我们带出去了证据...', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.6 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '（对镜头，声音嘶哑）观众朋友们...如果有人还在看...', {
+        mood: 'scared'
+      }),
+      mkLine('阿海', '深渊里有东西...它不是自然的...有人造了它...', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '深度1000米。\n雷达显示海面有救援船只接近。\n但画面中，四个人的状态越来越差。', {
+        sfx: [{ sfx: 'bubbles', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      })
+    ],
+    nextNodeId: 'ending_resolve_ascent',
+    repairEffects: [
+      { system: 'camera', amount: 15, message: '摄像系统逐步恢复' },
+      { system: 'communication', amount: 10, message: '通信信号逐渐增强' }
+    ]
+  },
+  {
+    id: 'ending_resolve_ascent',
+    title: '【命运裁定】',
+    background: 'escape',
+    dialogues: [
+      mkLine('', '救援船只的信号越来越近...但在这一刻，你仍然无法确定，等待你们的将是什么。', {
+        mood: 'calm',
+        autoAdvance: true,
+        autoAdvanceDelay: 2000
+      })
+    ],
+    nextNodeId: 'ending_survival'
+  },
+  {
+    id: 'ending_survival_ascent',
+    title: '【幸存者·上浮线】',
+    background: 'escape',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('', '72小时后。\n你在新闻中看到：深渊号成功完成深海科考任务，全体船员平安归来。\n直播录像被官方重新剪辑后发布，所有奇怪的部分都消失了。\n而你手中的这份原始备份...也许永远不会有人知道它的存在。', {
+        sfx: [{ sfx: 'water_flow', delay: 0, volume: 0.4 }],
+        mood: 'calm'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_survival',
+    endingTitle: '幸存者',
+    endingDescription: '你做出了关键的正确选择，帮助船员们找到了逃生的方法。72小时后，救援队在海平面发现了漂浮的求生舱。',
+    repairEffects: [
+      { system: 'hull', amount: 50, message: '舱体维修进行中...' },
+      { system: 'camera', amount: 50, message: '摄像系统恢复' },
+      { system: 'communication', amount: 50, message: '通信恢复' },
+      { system: 'sonar', amount: 50, message: '声呐恢复' },
+      { system: 'control', amount: 50, message: '操控系统恢复' },
+      { system: 'power', amount: 50, message: '动力系统恢复' }
+    ]
+  },
+  {
+    id: 'ending_truth_ascent',
+    title: '【深海真相·上浮线】',
+    background: 'glitch',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你拼凑出了所有线索，揭开了海底的秘密。\n即使成功上浮，即使官方试图掩盖——真相不会沉默。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.5 }],
+        mood: 'calm'
+      }),
+      mkLine('', '你手中的这份原始录像，将是撬开深渊的第一道裂缝。', {
+        mood: 'tense'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_truth',
+    endingTitle: '深海真相',
+    endingDescription: '你拼凑出了所有线索，揭开了海底的秘密。直播信号中断前的最后一刻，真相浮出水面——那不是事故，而是一场精心策划的伪装。',
+    repairEffects: [
+      { system: 'hull', amount: 40 },
+      { system: 'camera', amount: 40 },
+      { system: 'communication', amount: 40 },
+      { system: 'sonar', amount: 40 },
+      { system: 'control', amount: 40 },
+      { system: 'power', amount: 40 }
+    ]
+  },
+  {
+    id: 'ending_silence',
+    title: '【永远的沉默】',
+    background: 'dark',
+    bgm: 'calm',
+    dialogues: [
+      mkLine('', '你在后续的新闻中看到：深渊号船员被成功救起，但四人全部陷入深度昏迷。', {
+        mood: 'calm'
+      }),
+      mkLine('', '其中一人再也没有醒来。\n他们在昏迷前说的话，被官方判定为减压病导致的幻觉。', {
+        mood: 'calm'
+      }),
+      mkLine('', '但你知道真相。\n而现在，知道真相的人，又多了你一个。', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      })
+    ],
+    isEnding: true,
+    endingId: 'ending_silence',
+    endingTitle: '永远的沉默',
+    endingDescription: '潜艇最终消失在了马里亚纳海沟的最深处。没有人知道那天深海里到底发生了什么，只留下一段被截断的直播录像。'
+  },
+  {
+    id: 'signal_hub',
+    title: '【异常信号解析系统】',
+    background: 'terminal',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你切换到信号分析后台。屏幕上弹出三个模块：声呐图谱、噪声识别、字幕纠错。\n\n每一个模块都标记着「检测到异常」的红色警告。', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.4 }, { sfx: 'notify', delay: 800, volume: 0.3 }],
+        mood: 'tense'
+      }),
+      mkLine('老周', '（通讯频道）那边......你能帮我们看看声呐数据吗？这个信号我从来没见过。', {
+        mood: 'tense'
+      }),
+      mkLine('苏博士', '（通讯频道）还有那段被干扰的通话记录......如果能还原出来，对我们判断情况非常重要。', {
+        mood: 'calm'
+      })
+    ],
+    choices: [
+      {
+        id: 'c_signal_back',
+        text: '返回主线剧情',
+        nextNodeId: 'analyze_crew',
+        effect: { signal_analysis_visited: true }
+      }
+    ],
+    customInterface: 'SignalAnalysisHub',
+    evidenceRewards: ['sonar_raw_data'],
+    danmakus: [
+      mkDanmaku('ds1', '技术宅观众', '哦？这个分支很有意思！', 200, 3, 1500, '#66ffff'),
+      mkDanmaku('ds2', '信号处理', '声呐频谱图？我专业啊！', 800, 4, 900, '#ffff66')
+    ]
+  },
+  {
+    id: 'signal_sonar_complete',
+    title: '【声呐图谱解析完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你完成了声呐图谱的解析。异常回波的特征逐渐清晰——那不是海洋生物，也不是地质结构。', {
+        sfx: [{ sfx: 'sonar', delay: 0, volume: 0.6 }],
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【匹配完成：人造物体 · 金属材质 · 螺旋桨痕迹】', {
+        sfx: [{ sfx: 'notify', delay: 0, volume: 0.5 }, { sfx: 'notify', delay: 300, volume: 0.5 }, { sfx: 'notify', delay: 600, volume: 0.5 }],
+        mood: 'mystery'
+      }),
+      mkLine('老周', '（通讯）......这不可能。我们的潜水器是当前海域唯一的人造物体。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('', '你想起档案室里那些被划掉的记录。\n「深渊号」退役的真正原因——难道不是设备老化？', {
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['sonar_analysis_report', 'propeller_signature'],
+    clueUnlocked: 'secret_submarine',
+    trustEffect: {
+      changes: [
+        { target: 'laozhou', value: 15, reason: '关键技术支持' },
+        { target: 'suboshi', value: 10, reason: '数据实证' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 25 },
+      { endingId: 'ending_conspiracy', weight: 20 }
+    ]
+  },
+  {
+    id: 'signal_noise_complete',
+    title: '【噪声识别完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你从背景噪声中分离出了三段独立信号。一段是金属摩擦，一段是机械运转，还有一段——', {
+        sfx: [{ sfx: 'static', delay: 0, volume: 0.4 }],
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【第三段信号：人声 · 已降噪处理】', {
+        sfx: [{ sfx: 'whisper', delay: 0, volume: 0.6 }],
+        mood: 'tense'
+      }),
+      mkLine('（处理后的人声）', '「......目标已确认。按计划进入位置B。等待指令。」', {
+        sfx: [{ sfx: 'radio_noise', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('阿海', '（通讯）这、这是谁的声音？我们四个全程都在直播里！', {
+        mood: 'scared'
+      }),
+      mkLine('', '潜水器上有第五个人......\n或者，海底有另一群人。', {
+        mood: 'tense'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['human_voice_extract', 'plan_b_reference'],
+    clueUnlocked: 'fifth_person_present',
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: -10, reason: '感到被监视' },
+        { target: 'xiaolin', value: -5, reason: '恐慌' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_conspiracy', weight: 30 },
+      { endingId: 'ending_truth', weight: 15 }
+    ]
+  },
+  {
+    id: 'signal_subtitle_complete',
+    title: '【字幕纠错完成】',
+    background: 'dark',
+    bgm: 'mystery',
+    dialogues: [
+      mkLine('', '你纠正了被干扰的字幕。错误的字符背后，是被人为修改过的内容。', {
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【修正字幕：协议07真实条款】', {
+        sfx: [{ sfx: 'keyboard', delay: 0, volume: 0.5 }],
+        mood: 'mystery'
+      }),
+      mkLine('苏博士', '（通讯）......你不该看到那个的。', {
+        mood: 'calm'
+      }),
+      mkLine('', '修正后的字幕显示：\n\n「协议07第3条：如遇活体样本接触，执行清除程序。\n清除范围包括：样本、目击者......以及直播信号。」', {
+        sfx: [{ sfx: 'alarm', delay: 1000, volume: 0.5 }],
+        mood: 'scared'
+      }),
+      mkLine('小林', '（通讯）清除？！苏博士你——', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（通讯）......我也是刚刚才知道。那份协议......不是我签的。', {
+        sfx: [{ sfx: 'breath', delay: 0, volume: 0.5 }],
+        mood: 'scared'
+      })
+    ],
+    nextNodeId: 'signal_hub',
+    evidenceRewards: ['protocol_07_true_text', 'suboshi_innocent_hint'],
+    clueUnlocked: 'protocol_07_clearance',
+    trustEffect: {
+      changes: [
+        { target: 'suboshi', value: 20, reason: '证明其不知情' },
+        { target: 'xiaolin', value: 10, reason: '揭露真相' },
+        { target: 'laozhou', value: -10, reason: '怀疑其参与' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 30 },
+      { endingId: 'ending_betrayal', weight: 10 }
+    ]
+  },
+  {
+    id: 'signal_all_complete',
+    title: '【所有信号解析完毕】',
+    background: 'creature',
+    bgm: 'tense',
+    dialogues: [
+      mkLine('', '三个模块全部完成。系统将结果交叉比对后，生成了最终报告。', {
+        mood: 'mystery'
+      }),
+      mkLine('系统', '【综合结论：本次任务存在外部干预力量】\n\n1. 海域内存在第二艘人造潜艇（声呐证据）\n2. 有不明人员在场（人声证据）\n3. 任务协议被篡改（字幕证据）\n\n建议：立即中止任务，上浮避险。', {
+        sfx: [
+          { sfx: 'notify', delay: 0, volume: 0.4 },
+          { sfx: 'notify', delay: 400, volume: 0.4 },
+          { sfx: 'notify', delay: 800, volume: 0.5 }
+        ],
+        mood: 'tense'
+      }),
+      mkLine('老周', '（通讯）......我现在完全相信你了。不管那是什么，我们不该下来。', {
+        mood: 'scared'
+      }),
+      mkLine('苏博士', '（通讯）那个「协议07」......这不是科研项目，这是一个圈套。', {
+        mood: 'tense'
+      }),
+      mkLine('', '你将所有证据归档至证据板。\n真相的拼图，现在只差最后几块了。', {
+        mood: 'mystery'
+      })
+    ],
+    nextNodeId: 'analyze_crew',
+    evidenceRewards: ['comprehensive_report'],
+    clueUnlocked: 'external_interference',
+    trustEffect: {
+      changes: [
+        { target: 'ahai', value: 15, reason: '提供明确方向' },
+        { target: 'xiaolin', value: 15, reason: '提供明确方向' },
+        { target: 'laozhou', value: 10, reason: '数据支持' },
+        { target: 'suboshi', value: 10, reason: '数据支持' }
+      ]
+    },
+    endingWeightEffects: [
+      { endingId: 'ending_truth', weight: 20 },
+      { endingId: 'ending_survival', weight: 15 },
+      { endingId: 'ending_conspiracy', weight: 10 }
+    ]
+  }
+];
+
+export const storyData = {
+  nodes,
+  endings,
+  startNodeId: 'start'
+};
