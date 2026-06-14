@@ -42,8 +42,12 @@ import {
   updateCrewMentalState
 } from './store';
 import { get } from 'svelte/store';
-import { getEndingWeight, selectWeightedEnding, addEndingWeightModifier, evidenceBoard } from './evidence';
-import { applyChoiceWeight, endingRedirectMap } from './previewEndingResolver';
+import { getEndingWeight, getAllEndingWeights, selectWeightedEnding, addEndingWeightModifier, evidenceBoard } from './evidence';
+import {
+  applyChoiceWeight,
+  endingRedirectMap,
+  resolveEndingRedirect
+} from './endingResolver';
 import {
   checkMemoryCondition,
   selectDialogueVariant,
@@ -360,7 +364,7 @@ export function advance(): void {
     
     const effectiveNextId = resolveNextNodeBranches(node, node.nextNodeId);
     if (effectiveNextId) {
-      const redirectedNodeId = resolveEndingRedirect(node.id, effectiveNextId);
+      const redirectedNodeId = localResolveEndingRedirect(node.id, effectiveNextId);
       goToNode(redirectedNodeId);
     }
   }
@@ -461,23 +465,14 @@ function getTrustValue(from: CrewMemberId, to: CrewMemberId): number {
   return getCrewTrust(to);
 }
 
-function resolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
-  const config = endingRedirectMap[currentNodeId];
-  if (config) {
-    applyTrustEndingWeights(addEndingWeightModifier);
-
-    const locked = getLockedEnding(config.candidates);
-    if (locked) {
-      return config.nodeMap[locked] || nextNodeId;
-    }
-
-    const weightedEnding = selectWeightedEnding(config.candidates);
-    if (weightedEnding) {
-      return config.nodeMap[weightedEnding] || nextNodeId;
-    }
-  }
-
-  return nextNodeId;
+function localResolveEndingRedirect(currentNodeId: string, nextNodeId: string): string {
+  return resolveEndingRedirect(currentNodeId, nextNodeId, {
+    addModifier: addEndingWeightModifier,
+    applyTrustEndingWeights,
+    getLockedEnding,
+    selectWeightedEnding,
+    getAllEndingWeights
+  });
 }
 
 export function selectChoice(choiceId: string): void {

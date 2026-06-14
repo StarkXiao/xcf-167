@@ -35,7 +35,10 @@
     selectWeightedEnding,
     addEndingWeightModifier
   } from '../../lib/evidence';
-  import { baseEndingWeights } from '../../data/evidence';
+  import {
+    evidenceCards,
+    baseEndingWeights
+  } from '../../data/evidence';
   import {
     previewPlayState,
     resetPreviewPlayState,
