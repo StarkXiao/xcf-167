@@ -1,10 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { get } from 'svelte/store';
   import {
     editorState,
     allNodes,
-    selectedNode,
     selectNode,
     setActiveTab,
     setPreviewNode
@@ -15,33 +13,16 @@
     DialogueLine,
     Choice,
     Danmaku,
-    Ending,
-    StateCondition,
-    StateEffect,
-    TrustCondition,
-    TrustEffect,
-    MemoryCondition,
-    NextNodeBranch
+    Ending
   } from '../../types/game';
-  import {
-    globalMemory,
-    checkMemoryCondition,
-    unlockClue,
-    recordPlaythrough
-  } from '../../lib/memory';
   import {
     trustState,
     applyTrustEffect,
-    applyTrustChange,
-    checkTrustCondition,
-    getCrewTrust,
-    getCrewTrustLevel,
     getTrustLevel,
     getTrustLevelLabel,
     getTrustLevelColor,
     CREW_MEMBERS,
     resetTrustState,
-    getTrustEndingModifiers,
     getLockedEnding,
     applyTrustEndingWeights
   } from '../../lib/trust';
@@ -52,10 +33,26 @@
     resetEvidenceBoard,
     getAllEndingWeights,
     selectWeightedEnding,
-    addEndingWeightModifier,
-    getEndingWeight
+    addEndingWeightModifier
   } from '../../lib/evidence';
-  import { evidenceCards, baseEndingWeights } from '../../data/evidence';
+  import { baseEndingWeights } from '../../data/evidence';
+  import {
+    previewPlayState,
+    resetPreviewPlayState,
+    applyPreviewEffect,
+    applyPreviewMemoryEffect,
+    addVisitedNode,
+    incrementPlaythrough,
+    checkPreviewCondition,
+    checkPreviewTrustCondition,
+    checkPreviewMemoryCondition
+  } from '../../lib/previewState';
+  import {
+    applyChoiceWeight,
+    resolveEndingRedirect,
+    buildJudgmentInfo
+  } from '../../lib/previewEndingResolver';
+  import type { EndingJudgmentInfo } from '../../lib/previewEndingResolver';
 
   export let onClose: () => void;
 
@@ -72,7 +69,6 @@
   let danmakuTimeouts: any[] = [];
   let showChoices: boolean = false;
   let currentEnding: Ending | null = null;
-  let visitedPath: string[] = [];
   let autoAdvanceTimer: any = null;
 
   let currentNode: StoryNode | undefined;
@@ -81,12 +77,13 @@
   let atDialogueEnd: boolean = false;
   let hasChoices: boolean = false;
   let allEndings: Ending[] = [];
+  let endingJudgmentInfo: EndingJudgmentInfo | null = null;
 
-  let stateVariables: Record<string, any> = {};
-  let endingWeights: Record<string, number> = {};
-  let playthroughNumber: number = 1;
-  let unlockedClues: Record<string, boolean> = {};
-  let visitedNodes: Set<string> = new Set();
+  $: playState = $previewPlayState;
+  $: stateVariables = playState.stateVariables;
+  $: unlockedClues = playState.unlockedClues;
+  $: playthroughNumber = playState.playthroughNumber;
+  $: visitedPath = playState.visitedPath;
 
   $: currentNode = nodes.find(n => n.id === currentNodeId);
   $: currentDialogue = currentNode?.dialogues?.[dialogueIndex];
@@ -127,145 +124,8 @@
   $: trustInfo = $trustState;
   $: collectedEvidenceCount = $evidenceBoard.collectedEvidence.length;
 
-  const choiceWeightMap: Record<string, Record<string, Record<string, number>>> = {
-    intro_2: {
-      c_fast: { ending_truth: -10, ending_loop: 10 },
-      c_normal: { ending_truth: 10, ending_survival: 5 }
-    },
-    first_contact: {
-      c_stay: { ending_survival: 10, ending_truth: 5 },
-      c_danmaku: { ending_truth: 15, ending_madness: 5 },
-      c_creature: { ending_truth: 20, ending_madness: 10, ending_silence: 5 }
-    },
-    critical_choice: {
-      c_keep_live: { ending_truth: 25, ending_madness: 15, ending_silence: 10 },
-      c_keep_live_2: { ending_truth: 20, ending_madness: 10 },
-      c_stop_live: { ending_survival: 25, ending_loop: 10 },
-      c_emergency: { ending_survival: 15, ending_silence: 20, ending_truth: 5 }
-    },
-    stop_continue: {
-      c_trust_su: { ending_survival: 30, ending_silence: -10 },
-      c_doubt: { ending_loop: 30, ending_truth: 10, ending_madness: 10 }
-    }
-  };
-
-  const endingRedirectMap: Record<string, { candidates: string[]; nodeMap: Record<string, string> }> = {
-    ending_resolve_live: {
-      candidates: ['ending_truth', 'ending_madness'],
-      nodeMap: {
-        ending_truth: 'ending_truth_node',
-        ending_madness: 'ending_madness_node'
-      }
-    },
-    ending_resolve_ascent: {
-      candidates: ['ending_survival', 'ending_silence', 'ending_truth'],
-      nodeMap: {
-        ending_survival: 'ending_survival_ascent',
-        ending_silence: 'ending_silence',
-        ending_truth: 'ending_truth_ascent'
-      }
-    },
-    ending_resolve_stop: {
-      candidates: ['ending_survival', 'ending_loop', 'ending_madness'],
-      nodeMap: {
-        ending_survival: 'ending_survival_stop',
-        ending_loop: 'ending_loop_stop',
-        ending_madness: 'ending_madness_stop'
-      }
-    }
-  };
-
-  function applyPreviewChoiceWeight(nodeId: string, choiceId: string): void {
-    const modifiers = choiceWeightMap[nodeId]?.[choiceId];
-    if (modifiers) {
-      Object.entries(modifiers).forEach(([endingId, value]) => {
-        addEndingWeightModifier(endingId, value, `choice:${nodeId}:${choiceId}`);
-      });
-    }
-  }
-
-  function resolvePreviewEndingRedirect(currentNodeId: string, nextNodeId: string): string {
-    const config = endingRedirectMap[currentNodeId];
-    if (!config) return nextNodeId;
-
-    applyTrustEndingWeights(addEndingWeightModifier);
-
-    const locked = getLockedEnding(config.candidates);
-    if (locked) {
-      console.log(`[预览结局裁定] 锁定结局: ${locked}`);
-      return config.nodeMap[locked] || nextNodeId;
-    }
-
-    const weightedEnding = selectWeightedEnding(config.candidates);
-    console.log(`[预览结局裁定] 加权随机结果: ${weightedEnding}, 候选: ${config.candidates.join(',')}`);
-    if (weightedEnding) {
-      return config.nodeMap[weightedEnding] || nextNodeId;
-    }
-
-    return nextNodeId;
-  }
-
-  function checkPreviewCondition(condition?: StateCondition): boolean {
-    if (!condition) return true;
-    for (const [key, value] of Object.entries(condition)) {
-      if (stateVariables[key] !== value) return false;
-    }
-    return true;
-  }
-
-  function checkPreviewTrustCondition(condition?: TrustCondition): boolean {
-    return checkTrustCondition(condition);
-  }
-
-  function checkPreviewMemoryCondition(condition?: MemoryCondition): boolean {
-    if (!condition) return true;
-    const memory = get(globalMemory);
-
-    if (condition.requiredClues) {
-      for (const clueId of condition.requiredClues) {
-        if (!unlockedClues[clueId] && !memory.unlockedClues[clueId]) return false;
-      }
-    }
-
-    if (condition.anyClues) {
-      const hasAny = condition.anyClues.some(clueId => unlockedClues[clueId] || memory.unlockedClues[clueId]);
-      if (!hasAny) return false;
-    }
-
-    if (condition.requiredEndings) {
-      const memoryEndings = memory.playthroughHistory.map(p => p.endingId).filter(Boolean) as string[];
-      for (const endingId of condition.requiredEndings) {
-        if (!memoryEndings.includes(endingId)) return false;
-      }
-    }
-
-    if (condition.playthroughAtLeast) {
-      if (playthroughNumber < condition.playthroughAtLeast && memory.currentPlaythrough < condition.playthroughAtLeast) return false;
-    }
-
-    return true;
-  }
-
-  function applyPreviewEffect(effect?: StateEffect): void {
-    if (!effect) return;
-    for (const [key, value] of Object.entries(effect)) {
-      stateVariables[key] = value;
-    }
-  }
-
-  function applyPreviewTrustEffect(effect?: TrustEffect): void {
+  function applyPreviewTrustEffect(effect?: any): void {
     applyTrustEffect(effect);
-  }
-
-  function applyPreviewMemoryEffect(choice: Choice): void {
-    if (choice.memoryEffect?.clueToUnlock) {
-      unlockedClues[choice.memoryEffect.clueToUnlock] = true;
-    }
-  }
-
-  function addPreviewEndingWeight(endingId: string, value: number, source: string): void {
-    if (!endingWeights[endingId]) endingWeights[endingId] = 0;
-    endingWeights[endingId] += value;
   }
 
   function getChoiceDisplayText(choice: Choice): string {
@@ -309,17 +169,11 @@
     activeDanmakus = [];
     showChoices = false;
     currentEnding = null;
-    visitedPath = [];
-    stateVariables = {};
-    endingWeights = {};
-    unlockedClues = {};
-    visitedNodes = new Set();
     endingJudgmentInfo = null;
+    resetPreviewPlayState();
     resetTrustState();
     resetEvidenceBoard();
   }
-
-  let endingJudgmentInfo: { locked?: string; weights?: { endingId: string; weight: number; probability: number }[]; selected?: string; via?: string } | null = null;
 
   function stopAllTimers() {
     if (typingInterval) {
@@ -346,8 +200,7 @@
 
     currentNodeId = nodeId;
     dialogueIndex = 0;
-    visitedPath = [...visitedPath, nodeId];
-    visitedNodes.add(nodeId);
+    addVisitedNode(nodeId);
 
     if (node.bgm) {
       playBGM(node.bgm);
@@ -492,21 +345,14 @@
       } else {
         const nextId = resolveNextNodeId();
         if (nextId) {
-          const redirected = resolvePreviewEndingRedirect(currentNodeId, nextId);
-          if (redirected !== nextId) {
-            const preResolveWeights = getAllEndingWeights();
-            const eConfig = endingRedirectMap[currentNodeId];
-            endingJudgmentInfo = {
-              weights: preResolveWeights.filter(w => eConfig?.candidates.includes(w.endingId)),
-              selected: Object.entries(eConfig?.nodeMap || {}).find(([, v]) => v === redirected)?.[0] || redirected,
-              via: endingRedirectMap[currentNodeId] ? (Object.entries(endingRedirectMap[currentNodeId].nodeMap).find(([, v]) => v === redirected)?.[0] === getLockedEnding(endingRedirectMap[currentNodeId].candidates) ? 'locked' : 'weighted') : 'direct'
-            };
-            const lockTest = getLockedEnding(endingRedirectMap[currentNodeId]?.candidates || []);
-            if (lockTest) {
-              endingJudgmentInfo.locked = lockTest;
-              endingJudgmentInfo.via = 'locked';
-            }
-          }
+          const redirected = resolveEndingRedirect(currentNodeId, nextId, {
+            addModifier: addEndingWeightModifier,
+            applyTrustEndingWeights,
+            getLockedEnding,
+            selectWeightedEnding,
+            getAllEndingWeights
+          });
+          endingJudgmentInfo = buildJudgmentInfo(redirected, nextId, currentNodeId, getAllEndingWeights(), getLockedEnding);
           loadNode(redirected);
         } else if (currentNode?.isEnding) {
           const endingId = currentNode.endingId;
@@ -541,7 +387,7 @@
 
     const choiceId = choice.id || `idx_${currentNode?.choices?.indexOf(choice) ?? 0}`;
     if (currentNodeId) {
-      applyPreviewChoiceWeight(currentNodeId, choiceId);
+      applyChoiceWeight(currentNodeId, choiceId, addEndingWeightModifier);
     }
 
     if (choice.effect) {
@@ -555,21 +401,14 @@
     applyPreviewMemoryEffect(choice);
 
     if (choice.nextNodeId) {
-      const redirected = resolvePreviewEndingRedirect(currentNodeId, choice.nextNodeId);
-      if (redirected !== choice.nextNodeId) {
-        const preResolveWeights = getAllEndingWeights();
-        const eConfig = endingRedirectMap[currentNodeId];
-        endingJudgmentInfo = {
-          weights: preResolveWeights.filter(w => eConfig?.candidates.includes(w.endingId)),
-          selected: Object.entries(eConfig?.nodeMap || {}).find(([, v]) => v === redirected)?.[0] || redirected,
-          via: 'weighted'
-        };
-        const lockTest = getLockedEnding(endingRedirectMap[currentNodeId]?.candidates || []);
-        if (lockTest) {
-          endingJudgmentInfo.locked = lockTest;
-          endingJudgmentInfo.via = 'locked';
-        }
-      }
+      const redirected = resolveEndingRedirect(currentNodeId, choice.nextNodeId, {
+        addModifier: addEndingWeightModifier,
+        applyTrustEndingWeights,
+        getLockedEnding,
+        selectWeightedEnding,
+        getAllEndingWeights
+      });
+      endingJudgmentInfo = buildJudgmentInfo(redirected, choice.nextNodeId, currentNodeId, getAllEndingWeights(), getLockedEnding);
       loadNode(redirected);
     } else {
       alert('此选项没有设置跳转节点');
@@ -578,7 +417,7 @@
 
   function handleRestart() {
     playSFX('click');
-    playthroughNumber++;
+    incrementPlaythrough();
     startPreview();
   }
 
